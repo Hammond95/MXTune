@@ -528,7 +528,7 @@ void PluginGui::paint (Graphics& g)
             {
                 std::int32_t n = (i + 9 + 12 * 4) / 12;
                 char name[32];
-                sprintf(name, "%s%d", node_name[(unsigned)(i + 12 * 8) % 12], n);
+                snprintf(name, sizeof(name), "%s%d", node_name[(unsigned)(i + 12 * 8) % 12], n);
                 g.drawText(name, _draw_x - 24, y - 12, 24, 24, juce::Justification::centred, true);
             }
             else
@@ -569,7 +569,7 @@ void PluginGui::paint (Graphics& g)
         g.setOpacity(0.6);
 
         double bpm = _proc.get_bpm();
-        std::int32_t time_sig_denominator = _proc.get_time_sig_denominator();
+        (void)_proc.get_time_sig_denominator();
         double ppq_pos = _proc.get_ppq_position();
         double note_time_len = 60. / bpm;
         float ppq_time = _cur_time - ppq_pos * note_time_len;
@@ -611,11 +611,11 @@ void PluginGui::paint (Graphics& g)
             char str[32] = {0};
             if (_cur_node->time_end > _cur_node->time_start)
             {
-                sprintf(str, "%u(ms)", (std::uint32_t)((_cur_node->time_end - _cur_node->time_start) * 1000));
+                snprintf(str, sizeof(str), "%u(ms)", (std::uint32_t)((_cur_node->time_end - _cur_node->time_start) * 1000));
             }
             else
             {
-                sprintf(str, "%u(ms)", (std::uint32_t)((_cur_node->time_start - _cur_node->time_end) * 1000));
+                snprintf(str, sizeof(str), "%u(ms)", (std::uint32_t)((_cur_node->time_start - _cur_node->time_end) * 1000));
             }
 
             String text (str);
@@ -1089,7 +1089,7 @@ void PluginGui::buttonClicked (Button* buttonThatWasClicked)
     {
         //[UserButtonCode_textButtonSetting] -- add your button handler code here..
         SettingGui component(_proc);
-        std::int32_t r = juce::DialogWindow::showModalDialog("Setiing", &component, 0, juce::Colours::whitesmoke, false, false, false);
+        juce::DialogWindow::showModalDialog("Setiing", &component, 0, juce::Colours::whitesmoke, false, false, false);
         //[/UserButtonCode_textButtonSetting]
     }
     else if (buttonThatWasClicked == textButtonUndoNote.get())
@@ -1358,7 +1358,7 @@ void PluginGui::mouseUp (const MouseEvent& e)
     //[/UserCode_mouseUp]
 }
 
-void PluginGui::mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& wheel)
+void PluginGui::mouseWheelMove (const MouseEvent& /*e*/, const MouseWheelDetails& wheel)
 {
     //[UserCode_mouseWheelMove] -- Add your code here...
 #if 0

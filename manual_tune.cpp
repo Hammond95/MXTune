@@ -521,7 +521,7 @@ void manual_tune::redo()
     }
 }
     
-bool manual_tune::check_key(float notes_weights[12], float time_min_len, float time_max_interval)
+bool manual_tune::check_key(float notes_weights[12], float time_min_len, float /*time_max_interval*/)
 {
     pitch_node last;
     bool flag = true;

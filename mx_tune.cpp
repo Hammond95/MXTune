@@ -371,7 +371,7 @@ void mx_tune::run(float* in, float *out, std::int32_t n, float timestamp)
 }
 
 
-void mx_tune::record_midi_to_note(std::int32_t n, float timestamp,
+void mx_tune::record_midi_to_note(std::int32_t /*n*/, float timestamp,
                                 const std::list<midi_msg_node>& midi_list,
                                 float attack, float release, float amount)
 {
