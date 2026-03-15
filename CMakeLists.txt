@@ -8,8 +8,24 @@ cmake_minimum_required(VERSION 3.0)
 #}}}}
 
 enable_language(CXX C ASM)
-# Project name
-project(mx_tune)
+# Project name and version — update MXTUNE_VERSION to cut a new release
+set(MXTUNE_VERSION "1.1.2")
+project(mx_tune VERSION ${MXTUNE_VERSION})
+add_definitions(-DMXTUNE_VERSION="${MXTUNE_VERSION}")
+
+# Derive a per-version VST3 plugin code so each version is treated as a
+# distinct plugin by hosts (allows multiple versions loaded simultaneously).
+# Scheme: 0x4d58MMPP  where MM = major<<4|minor, PP = patch  ('MX' prefix)
+string(REPLACE "." ";" _ver_parts "${MXTUNE_VERSION}")
+list(GET _ver_parts 0 _ver_major)
+list(GET _ver_parts 1 _ver_minor)
+list(GET _ver_parts 2 _ver_patch)
+math(EXPR MXTUNE_PLUGIN_CODE
+    "(0x4d58 * 65536) + (${_ver_major} * 4096) + (${_ver_minor} * 256) + ${_ver_patch}")
+# Override JucePlugin_Name and JucePlugin_PluginCode (both are #ifndef-guarded
+# in JucePluginDefines.h, so command-line -D definitions take precedence).
+add_definitions("-DJucePlugin_Name=\"MXTune ${MXTUNE_VERSION}\"")
+add_definitions(-DJucePlugin_PluginCode=${MXTUNE_PLUGIN_CODE})
 
 
 

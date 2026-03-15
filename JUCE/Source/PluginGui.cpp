@@ -421,7 +421,8 @@ PluginGui::PluginGui (AutotalentAudioProcessor& p)
     //[/UserPreSize]
 
     setSize (860, 600);
-
+    setResizable (true, true);
+    setResizeLimits (430, 300, 10000, 10000);
 
     //[Constructor] You can add your own custom stuff here..
     _update_gui_parameter();
@@ -498,10 +499,18 @@ void PluginGui::paint (Graphics& g)
         int x = 152, y = 112, width = 696, height = 472;
         Colour fillColour = Colour (0x04000000);
         //[UserPaintCustomArguments] Customize the painting arguments here..
-        _draw_x = x + 24;
-        _draw_y = y;
-        _draw_w = width - 24;
-        _draw_h = height;
+        {
+            float sx = (float)getWidth()  / 860.0f;
+            float sy = (float)getHeight() / 600.0f;
+            x      = (int)roundf (152 * sx);
+            y      = (int)roundf (112 * sy);
+            width  = (int)roundf (696 * sx);
+            height = (int)roundf (472 * sy);
+            _draw_x = x + (int)roundf (24 * sx);
+            _draw_y = y;
+            _draw_w = width - (int)roundf (24 * sx);
+            _draw_h = height;
+        }
         //[/UserPaintCustomArguments]
         g.setColour (fillColour);
         g.fillRect (x, y, width, height);
@@ -730,6 +739,59 @@ void PluginGui::resized()
     //[/UserPreResize]
 
     //[UserResized] Add your own custom resize handling here..
+    float sx = (float)getWidth()  / 860.0f;
+    float sy = (float)getHeight() / 600.0f;
+
+    auto sc = [&](int x, int y, int w, int h) -> juce::Rectangle<int> {
+        return { (int)roundf (x * sx), (int)roundf (y * sy),
+                 (int)roundf (w * sx), (int)roundf (h * sy) };
+    };
+
+    groupComponent6->setBounds      (sc (144, 96,  712, 496));
+    groupComponent4->setBounds      (sc (248, 8,   608, 88));
+    groupComponent2->setBounds      (sc (8,   96,  136, 312));
+    sliderAttack->setBounds         (sc (280, 56,  64,  24));
+    groupComponent5->setBounds      (sc (144, 96,  712, 496));
+    groupComponent->setBounds       (sc (8,   8,   240, 88));
+    toggleButtonTrack->setBounds    (sc (712, 24,  64,  24));
+    toggleButtonAutoTune->setBounds (sc (16,  24,  96,  24));
+    toggleButtonNoteA->setBounds    (sc (24,  216, 48,  24));
+    toggleButtonNoteBb->setBounds   (sc (24,  248, 48,  24));
+    toggleButtonNoteB->setBounds    (sc (24,  280, 48,  24));
+    toggleButtonNoteC->setBounds    (sc (24,  312, 48,  24));
+    toggleButtonNoteDb->setBounds   (sc (24,  344, 48,  24));
+    toggleButtonNoteD->setBounds    (sc (24,  376, 48,  24));
+    toggleButtonNoteEb->setBounds   (sc (80,  216, 48,  24));
+    toggleButtonNoteE->setBounds    (sc (80,  248, 48,  24));
+    toggleButtonNoteF->setBounds    (sc (80,  280, 48,  24));
+    toggleButtonNoteGb->setBounds   (sc (80,  312, 48,  24));
+    toggleButtonNoteAb->setBounds   (sc (80,  376, 48,  24));
+    toggleButtonNoteG->setBounds    (sc (80,  344, 48,  24));
+    textButtonSnapKey->setBounds    (sc (624, 24,  80,  24));
+    textButtonClearPitch->setBounds (sc (784, 64,  64,  24));
+    comboBoxKey->setBounds          (sc (32,  120, 88,  24));
+    comboBoxKeyType->setBounds      (sc (32,  152, 88,  24));
+    groupComponent3->setBounds      (sc (8,   408, 136, 184));
+    sliderRelease->setBounds        (sc (368, 56,  64,  24));
+    sliderAmount->setBounds         (sc (456, 56,  64,  24));
+    label4->setBounds               (sc (272, 24,  80,  24));
+    label5->setBounds               (sc (360, 24,  80,  24));
+    label6->setBounds               (sc (456, 24,  64,  24));
+    toggleButtonSnap->setBounds     (sc (784, 24,  64,  24));
+    textButtonClearNote->setBounds  (sc (712, 64,  64,  24));
+    label7->setBounds               (sc (16,  56,  56,  24));
+    sliderATSmooth->setBounds       (sc (72,  56,  40,  24));
+    label8->setBounds               (sc (128, 56,  56,  24));
+    sliderATAmount->setBounds       (sc (184, 56,  40,  24));
+    textButtonCANote->setBounds     (sc (624, 64,  80,  24));
+    textButtonDetectKey->setBounds  (sc (32,  184, 88,  24));
+    label3->setBounds               (sc (16,  432, 56,  24));
+    sliderMinLen->setBounds         (sc (80,  432, 48,  24));
+    label11->setBounds              (sc (16,  464, 56,  24));
+    sliderMaxInterval->setBounds    (sc (80,  464, 48,  24));
+    textButtonSetting->setBounds    (sc (24,  512, 104, 40));
+    textButtonUndoNote->setBounds   (sc (552, 24,  64,  24));
+    textButtonRedoNote->setBounds   (sc (552, 64,  64,  24));
     //[/UserResized]
 }
 

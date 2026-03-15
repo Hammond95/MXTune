@@ -8,6 +8,14 @@ NC='\033[0m'
 echo_step() { echo -e "${GREEN}==> $1${NC}"; }
 
 # ---------------------------------------------------------------------------
+# Read version from CMakeLists.txt (single source of truth)
+# ---------------------------------------------------------------------------
+PLUGIN_VERSION="$(grep -m1 'set(MXTUNE_VERSION' "$SCRIPT_DIR/CMakeLists.txt" \
+    | sed 's/.*set(MXTUNE_VERSION[[:space:]]*"\([^"]*\)".*/\1/')"
+: "${PLUGIN_VERSION:?Could not parse MXTUNE_VERSION from CMakeLists.txt}"
+echo_step "Building MXTune version ${PLUGIN_VERSION}"
+
+# ---------------------------------------------------------------------------
 # 1. Homebrew dependencies (includes aubio, soundtouch, rubberband)
 # ---------------------------------------------------------------------------
 echo_step "Checking Homebrew dependencies..."
@@ -96,8 +104,18 @@ HOMEBREW_PREFIX="$(brew --prefix)"
 export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
 mkdir -p "$SCRIPT_DIR/build-cmake"
+# Remove stale cache if it was generated from a different source directory
+if [ -f "$SCRIPT_DIR/build-cmake/CMakeCache.txt" ]; then
+    cached_src="$(grep -m1 '^CMAKE_HOME_DIRECTORY' "$SCRIPT_DIR/build-cmake/CMakeCache.txt" \
+        | cut -d= -f2)"
+    if [ "$cached_src" != "$SCRIPT_DIR" ]; then
+        echo_step "Stale CMake cache detected, clearing build directory..."
+        rm -rf "$SCRIPT_DIR/build-cmake"
+        mkdir -p "$SCRIPT_DIR/build-cmake"
+    fi
+fi
 pushd "$SCRIPT_DIR/build-cmake"
-cmake .. -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX"
+cmake "$SCRIPT_DIR" -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX"
 make -j"$(sysctl -n hw.logicalcpu)"
 popd
 
@@ -107,7 +125,7 @@ popd
 # The plugin only exports GetPluginFactory (VST3); VST2 is not supported by
 # JUCE 7's open-source build.
 # ---------------------------------------------------------------------------
-VST3_BUNDLE="/Library/Audio/Plug-Ins/VST3/mx_tune.vst3"
+VST3_BUNDLE="/Library/Audio/Plug-Ins/VST3/mx_tune-${PLUGIN_VERSION}.vst3"
 echo_step "Installing VST3 bundle to $VST3_BUNDLE ..."
 
 sudo rm -rf "$VST3_BUNDLE"
@@ -117,7 +135,7 @@ sudo mkdir -p "$VST3_BUNDLE/Contents/MacOS"
 sudo cp "$SCRIPT_DIR/build-cmake/libmx_tune.dylib" "$VST3_BUNDLE/Contents/MacOS/mx_tune"
 
 # Write the required Info.plist so macOS and hosts recognise it as a valid bundle
-sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << 'PLIST'
+sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -127,7 +145,7 @@ sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << 'PLIST'
     <key>CFBundleExecutable</key>
     <string>mx_tune</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hammond95.mxtune</string>
+    <string>com.hammond95.MXTune</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -135,9 +153,9 @@ sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << 'PLIST'
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>${PLUGIN_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>${PLUGIN_VERSION}</string>
     <key>CFBundleSignature</key>
     <string>hmmr</string>
     <key>CSResourcesFileMapped</key>
@@ -151,5 +169,5 @@ sudo chown -R root:wheel "$VST3_BUNDLE"
 sudo codesign --force --sign - "$VST3_BUNDLE"
 sudo chmod -R 755 "$VST3_BUNDLE"
 
-echo_step "Done! Plugin installed to $VST3_BUNDLE"
+echo_step "Done! MXTune ${PLUGIN_VERSION} installed to $VST3_BUNDLE"
 echo_step "In Ableton: Preferences > Plug-Ins > enable VST3, rescan, look for 'mx_tune'"
