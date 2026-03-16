@@ -118,6 +118,7 @@ public:
     double get_bpm() { return _bpm; }
     double get_ppq_position() { return _ppq_position; }
     std::int32_t get_time_sig_denominator() { return _time_sig_denominator; }
+    std::int32_t get_time_sig_numerator()   { return _time_sig_numerator; }
     bool is_playing() { return _is_playing; }
     
     
@@ -143,6 +144,7 @@ private:
     double _bpm = 0;
     double _ppq_position = 0;
     std::int32_t _time_sig_denominator = 0;
+    std::int32_t _time_sig_numerator   = 4;
     bool _is_playing = false;
     bool _is_bypassed = false;
     

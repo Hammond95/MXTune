@@ -1,5 +1,6 @@
 build-cmake/
 build.log
+errors.log
 JUCE/Builds/
 JUCE/JuceLibraryCode/
 VST3_SDK/

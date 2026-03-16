@@ -8,11 +8,10 @@ NC='\033[0m'
 echo_step() { echo -e "${GREEN}==> $1${NC}"; }
 
 # ---------------------------------------------------------------------------
-# Read version from CMakeLists.txt (single source of truth)
+# Read version from VERSION file (single source of truth)
 # ---------------------------------------------------------------------------
-PLUGIN_VERSION="$(grep -m1 'set(MXTUNE_VERSION' "$SCRIPT_DIR/CMakeLists.txt" \
-    | sed 's/.*set(MXTUNE_VERSION[[:space:]]*"\([^"]*\)".*/\1/')"
-: "${PLUGIN_VERSION:?Could not parse MXTUNE_VERSION from CMakeLists.txt}"
+PLUGIN_VERSION="$(cat "$SCRIPT_DIR/VERSION")"
+: "${PLUGIN_VERSION:?VERSION file is missing or empty}"
 echo_step "Building MXTune version ${PLUGIN_VERSION}"
 
 # ---------------------------------------------------------------------------

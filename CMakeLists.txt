@@ -8,8 +8,9 @@ cmake_minimum_required(VERSION 3.0)
 #}}}}
 
 enable_language(CXX C ASM)
-# Project name and version — update MXTUNE_VERSION to cut a new release
-set(MXTUNE_VERSION "1.1.2")
+# Project name and version — edit VERSION file to cut a new release
+file(READ "${CMAKE_CURRENT_LIST_DIR}/VERSION" MXTUNE_VERSION)
+string(STRIP "${MXTUNE_VERSION}" MXTUNE_VERSION)
 project(mx_tune VERSION ${MXTUNE_VERSION})
 add_definitions(-DMXTUNE_VERSION="${MXTUNE_VERSION}")
 
@@ -102,7 +103,6 @@ ENDIF ()
 #}}}}
 
 include_directories(
-    .
     JUCE/Source
 )
 
@@ -284,11 +284,14 @@ ELSEIF (APPLE)
         "-lfftw3f"
         "-lSystem"
     )
-    set(CMAKE_C_FLAGS "-fvisibility=hidden -DNDEBUG -Wno-unknown-warning-option ${MX_TUNE_CFLAGS}")
-    set(CMAKE_CXX_FLAGS "-fvisibility=hidden -std=c++17 -DNDEBUG -Wno-unknown-warning-option ${MX_TUNE_CFLAGS}")
+    # -iquote adds the project root to the quoted-include search path only,
+    # preventing <version> (C++20 STL header) from resolving to ./VERSION
+    # on macOS's case-insensitive filesystem.
+    set(CMAKE_C_FLAGS "-fvisibility=hidden -DNDEBUG -Wno-unknown-warning-option -iquote ${CMAKE_CURRENT_LIST_DIR} ${MX_TUNE_CFLAGS}")
+    set(CMAKE_CXX_FLAGS "-fvisibility=hidden -std=c++17 -DNDEBUG -Wno-unknown-warning-option -iquote ${CMAKE_CURRENT_LIST_DIR} ${MX_TUNE_CFLAGS}")
 ELSEIF (UNIX)
-    set(CMAKE_C_FLAGS "-fvisibility=hidden ${MX_TUNE_CFLAGS}")
-    set(CMAKE_CXX_FLAGS "-fvisibility=hidden ${MX_TUNE_CFLAGS}")
+    set(CMAKE_C_FLAGS "-fvisibility=hidden -iquote ${CMAKE_CURRENT_LIST_DIR} ${MX_TUNE_CFLAGS}")
+    set(CMAKE_CXX_FLAGS "-fvisibility=hidden -iquote ${CMAKE_CURRENT_LIST_DIR} ${MX_TUNE_CFLAGS}")
     
     IF (MXTUNE_USE_STATIC_LIB)
         set(LINK_OPTIONS ${LINK_OPTIONS} "-s -lGL -lpthread -ldl -lX11 -lXext ${FREETYPE_LDFLAGS} -Wl,--no-undefined -Wl,-Bsymbolic -Wl,-Bstatic ${MX_TUNE_LIBRARIES} -Wl,-Bdynamic -Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,--exclude-libs,ALL -fPIC")

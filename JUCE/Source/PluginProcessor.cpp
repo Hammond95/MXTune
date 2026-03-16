@@ -230,7 +230,10 @@ void AutotalentAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuf
             if (auto t   = posInfo->getTimeInSeconds())      _cur_time              = *t;
             if (auto bpm = posInfo->getBpm())                _bpm                   = *bpm;
             if (auto ppq = posInfo->getPpqPosition())        _ppq_position          = *ppq;
-            if (auto ts = posInfo->getTimeSignature()) _time_sig_denominator = ts->denominator;
+            if (auto ts = posInfo->getTimeSignature()) {
+                _time_sig_denominator = ts->denominator;
+                _time_sig_numerator   = ts->numerator;
+            }
             _is_playing = posInfo->getIsPlaying();
         }
     }

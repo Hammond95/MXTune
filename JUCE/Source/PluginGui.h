@@ -64,6 +64,7 @@ public:
     void _y_zoom(bool in);
 
     void _draw_note_limit(float& x0, float& y0, float& x1, float& y1);
+    void _jump_to_measure(bool forward);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -103,13 +104,18 @@ private:
     int _draw_h = 0;
     float _margin = 24;
 
+    int   _scrub_bar_y = 0;
+    int   _scrub_bar_h = 0;
+    bool  _scrub_dragging = false;
+    float _scrub_view_total = 300.f; // total time range shown in the minimap bar
+
     const float _pitch_max = 39.;
     const float _pitch_min = -48.;
     float _pitch_up = 0 - 9 + 12;
     float _pitch_down = 0 - 9 - 12;
 
     const float _time_min_len = 0.5;
-    const float _time_max_len = 10 * 60;
+    const float _time_max_len = 60 * 60;
     float _time_left = 0.;
     float _time_right = 10.;
 

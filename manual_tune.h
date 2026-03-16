@@ -23,6 +23,7 @@
 #include <memory>
 #include <map>
 #include <list>
+#include <vector>
 #include <algorithm>
 #include <math.h>
 #include <float.h>
@@ -88,7 +89,7 @@ public:
     
     
 public:
-    explicit manual_tune(std::uint32_t max_len = 10 * 60 * 1000);
+    explicit manual_tune(std::uint32_t max_len = 60 * 60 * 1000);
     ~manual_tune();
     
 private:
@@ -151,9 +152,9 @@ private:
     void _save_history();
     
 private:
-    pitch_node *_inpitch;
-    pitch_node *_outpitch;
-    std::shared_ptr<tune_node> *_tune_list;
+    std::vector<pitch_node> _inpitch;
+    std::vector<pitch_node> _outpitch;
+    std::vector<std::shared_ptr<tune_node>> _tune_list;
     std::shared_ptr<tune_node> _select;
     tune_node _select_bak;
     std::uint32_t _max_len;
