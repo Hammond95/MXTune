@@ -142,21 +142,21 @@ int AutotalentAudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void AutotalentAudioProcessor::setCurrentProgram (int index)
+void AutotalentAudioProcessor::setCurrentProgram (int /*index*/)
 {
 }
 
-const String AutotalentAudioProcessor::getProgramName (int index)
+const String AutotalentAudioProcessor::getProgramName (int /*index*/)
 {
     return {};
 }
 
-void AutotalentAudioProcessor::changeProgramName (int index, const String& newName)
+void AutotalentAudioProcessor::changeProgramName (int /*index*/, const String& /*newName*/)
 {
 }
 
 //==============================================================================
-void AutotalentAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void AutotalentAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
@@ -225,14 +225,16 @@ void AutotalentAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuf
     AudioPlayHead *play_head = getPlayHead();
     if (play_head)
     {
-        AudioPlayHead::CurrentPositionInfo result;
-        if (play_head->getCurrentPosition(result))
+        if (auto posInfo = play_head->getPosition())
         {
-            _cur_time = result.timeInSeconds;
-            _bpm = result.bpm;
-            _ppq_position = result.ppqPosition;
-            _time_sig_denominator = result.timeSigDenominator;
-            _is_playing = result.isPlaying;
+            if (auto t   = posInfo->getTimeInSeconds())      _cur_time              = *t;
+            if (auto bpm = posInfo->getBpm())                _bpm                   = *bpm;
+            if (auto ppq = posInfo->getPpqPosition())        _ppq_position          = *ppq;
+            if (auto ts = posInfo->getTimeSignature()) {
+                _time_sig_denominator = ts->denominator;
+                _time_sig_numerator   = ts->numerator;
+            }
+            _is_playing = posInfo->getIsPlaying();
         }
     }
     
@@ -366,7 +368,7 @@ void AutotalentAudioProcessor::getStateInformation (MemoryBlock& destData)
     
     {
         kvbuf *array = kvbuf_create_array(&hooks);
-        for (std::int32_t i = 0; i < _misc_param.length(); i++)
+        for (std::int32_t i = 0; i < (std::int32_t)_misc_param.length(); i++)
         {
             kvbuf_add_item_to_array(array, kvbuf_create_int8(&hooks, _misc_param.c_str()[i]));
         }
@@ -798,7 +800,7 @@ void AutotalentAudioProcessor::parameterValueChanged (int parameterIndex, float 
     
 }
 
-void AutotalentAudioProcessor::parameterGestureChanged (int parameterIndex, bool gestureIsStarting)
+void AutotalentAudioProcessor::parameterGestureChanged (int /*parameterIndex*/, bool gestureIsStarting)
 {
     //std::lock_guard<std::mutex> l(_mtx);
     _gesture_is_starting = gestureIsStarting;
@@ -888,11 +890,10 @@ void AutotalentAudioProcessor::_record_midi_to_note(MidiBuffer& midiMessages, st
     if (_midi_record)
     {
         std::list<mx_tune::midi_msg_node> msg_list;
-        MidiBuffer::Iterator midi_iter(midiMessages);
-        MidiMessage result;
-        std::int32_t sample_position = 0;
-        while (midi_iter.getNextEvent(result, sample_position))
+        for (const auto metadata : midiMessages)
         {
+            const MidiMessage& result = metadata.getMessage();
+            std::int32_t sample_position = metadata.samplePosition;
             if (result.isNoteOn())
             {
                 mx_tune::midi_msg_node node;

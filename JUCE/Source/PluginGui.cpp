@@ -421,7 +421,8 @@ PluginGui::PluginGui (AutotalentAudioProcessor& p)
     //[/UserPreSize]
 
     setSize (860, 600);
-
+    setResizable (true, true);
+    setResizeLimits (430, 300, 10000, 10000);
 
     //[Constructor] You can add your own custom stuff here..
     _update_gui_parameter();
@@ -498,13 +499,69 @@ void PluginGui::paint (Graphics& g)
         int x = 152, y = 112, width = 696, height = 472;
         Colour fillColour = Colour (0x04000000);
         //[UserPaintCustomArguments] Customize the painting arguments here..
-        _draw_x = x + 24;
-        _draw_y = y;
-        _draw_w = width - 24;
-        _draw_h = height;
+        {
+            float sx = (float)getWidth()  / 860.0f;
+            float sy = (float)getHeight() / 600.0f;
+            x      = (int)roundf (152 * sx);
+            y      = (int)roundf (112 * sy);
+            width  = (int)roundf (696 * sx);
+            height = (int)roundf (472 * sy);
+            _draw_x = x + (int)roundf (24 * sx);
+            _draw_w = width - (int)roundf (24 * sx);
+
+            // Scrub bar sits inside the notes panel with a small gap above and below
+            // so it doesn't touch the GroupComponent border line.
+            int gap = juce::jmax(1, (int)roundf(2 * sy));
+            _scrub_bar_h = juce::jmax(8, (int)roundf(12 * sy));
+            _scrub_bar_y = y + gap;
+            _draw_y      = _scrub_bar_y + _scrub_bar_h + gap;
+            _draw_h      = height - (_draw_y - y);
+        }
         //[/UserPaintCustomArguments]
         g.setColour (fillColour);
         g.fillRect (x, y, width, height);
+    }
+
+    // Overview/minimap bar: shows the full timeline, the current view window,
+    // and the playback cursor. Clicking/dragging pans the notes view.
+    // (VST plugins have read-only transport — the host playhead cannot be moved
+    //  programmatically, but the plugin view can navigate the whole song.)
+    {
+        // Dynamically size the total range to fit all known content + some headroom
+        float data_end = _proc.get_manual_tune().get_time_len();
+        _scrub_view_total = juce::jmax(60.f, juce::jmax(_cur_time * 1.2f, data_end * 1.1f));
+        _scrub_view_total = juce::jmin(_scrub_view_total, (float)_time_max_len);
+
+        auto t2sx = [&](float t) -> float {
+            return _draw_x + t / _scrub_view_total * _draw_w;
+        };
+
+        // Background
+        g.setColour(juce::Colour(0xff151d22));
+        g.fillRect(_draw_x, _scrub_bar_y, _draw_w, _scrub_bar_h);
+
+        // Current view window highlight
+        float vx0 = juce::jmax((float)_draw_x,          t2sx(_time_left));
+        float vx1 = juce::jmin((float)(_draw_x + _draw_w), t2sx(_time_right));
+        g.setColour(juce::Colours::white.withAlpha(0.18f));
+        g.fillRect((int)vx0, _scrub_bar_y, (int)(vx1 - vx0), _scrub_bar_h);
+
+        // Playhead in the minimap
+        float px = t2sx(_cur_time);
+        if (px >= (float)_draw_x && px <= (float)(_draw_x + _draw_w))
+        {
+            float top = (float)_scrub_bar_y;
+            float bot = (float)(_scrub_bar_y + _scrub_bar_h);
+            g.setColour(juce::Colours::red);
+            g.drawLine(px, top, px, bot, 1.5f);
+            juce::Path tri;
+            tri.addTriangle(px - 4.f, top + 1.f, px + 4.f, top + 1.f, px, bot - 1.f);
+            g.fillPath(tri);
+        }
+
+        // Border
+        g.setColour(juce::Colours::white.withAlpha(0.12f));
+        g.drawRect(_draw_x, _scrub_bar_y, _draw_w, _scrub_bar_h, 1);
     }
 
     //[UserPaint] Add your own custom painting code here..
@@ -528,7 +585,7 @@ void PluginGui::paint (Graphics& g)
             {
                 std::int32_t n = (i + 9 + 12 * 4) / 12;
                 char name[32];
-                sprintf(name, "%s%d", node_name[(unsigned)(i + 12 * 8) % 12], n);
+                snprintf(name, sizeof(name), "%s%d", node_name[(unsigned)(i + 12 * 8) % 12], n);
                 g.drawText(name, _draw_x - 24, y - 12, 24, 24, juce::Justification::centred, true);
             }
             else
@@ -563,28 +620,62 @@ void PluginGui::paint (Graphics& g)
             g.setColour (juce::Colours::red);
             g.drawLine(x, y1, x, y2, 1);
         }
+
     }
 
+    // draw measure and beat grid
     {
-        g.setOpacity(0.6);
-
         double bpm = _proc.get_bpm();
-        std::int32_t time_sig_denominator = _proc.get_time_sig_denominator();
-        double ppq_pos = _proc.get_ppq_position();
-        double note_time_len = 60. / bpm;
-        float ppq_time = _cur_time - ppq_pos * note_time_len;
-
-        float y1 = _pitch_to_y(_pitch_up);
-        float y2 = _pitch_to_y(_pitch_down);
-        double step_time = note_time_len;
-
-        for (float t = ppq_time; t < _time_right; t += step_time)
+        if (bpm > 0.0)
         {
-            float x = _time_to_x(t);
-            if (x > _draw_x && x < _draw_x + _draw_w)
+            int numerator = _proc.get_time_sig_numerator();
+            if (numerator <= 0) numerator = 4;
+
+            double beat_len  = 60.0 / bpm;
+            double ppq_time  = _cur_time - _proc.get_ppq_position() * beat_len;
+
+            float y1 = _pitch_to_y(_pitch_up);
+            float y2 = _pitch_to_y(_pitch_down);
+
+            // first beat index at or before _time_left
+            long long first_bi = (long long)floor((_time_left - ppq_time) / beat_len) - 1;
+
+            float label_font_size = juce::jmax(9.0f, 11.0f * (float)getWidth() / 860.0f);
+            g.setFont(Font(label_font_size));
+
+            for (long long bi = first_bi; ; ++bi)
             {
-                g.setColour(juce::Colours::white);
-                g.drawLine(x, y1, x, y2, 0.1);
+                double t = ppq_time + bi * beat_len;
+                if (t > _time_right) break;
+
+                float x = _time_to_x((float)t);
+                if (x < _draw_x || x > _draw_x + _draw_w) continue;
+
+                // beat position within measure (handles negative bi correctly)
+                int beat_in_measure = (int)(((bi % numerator) + numerator) % numerator);
+                bool is_measure_start = (beat_in_measure == 0);
+
+                if (is_measure_start)
+                {
+                    g.setColour(juce::Colours::white.withAlpha(0.45f));
+                    g.drawLine(x, y1, x, y2, 1.0f);
+
+                    // 1-based measure number (floor division for correct negative handling)
+                    long long measure_num = (long long)floor((double)bi / numerator) + 1;
+                    if (measure_num >= 1)
+                    {
+                        g.setColour(juce::Colours::white.withAlpha(0.65f));
+                        g.drawText(String(measure_num),
+                                   (int)x + 2, _draw_y + 2,
+                                   40, (int)label_font_size + 4,
+                                   Justification::centredLeft, false);
+                    }
+                }
+                else
+                {
+                    g.setColour(juce::Colours::white.withAlpha(0.12f));
+                    g.drawLine(x, y1, x, y2, 0.5f);
+                }
             }
         }
     }
@@ -611,11 +702,11 @@ void PluginGui::paint (Graphics& g)
             char str[32] = {0};
             if (_cur_node->time_end > _cur_node->time_start)
             {
-                sprintf(str, "%u(ms)", (std::uint32_t)((_cur_node->time_end - _cur_node->time_start) * 1000));
+                snprintf(str, sizeof(str), "%u(ms)", (std::uint32_t)((_cur_node->time_end - _cur_node->time_start) * 1000));
             }
             else
             {
-                sprintf(str, "%u(ms)", (std::uint32_t)((_cur_node->time_start - _cur_node->time_end) * 1000));
+                snprintf(str, sizeof(str), "%u(ms)", (std::uint32_t)((_cur_node->time_start - _cur_node->time_end) * 1000));
             }
 
             String text (str);
@@ -730,6 +821,59 @@ void PluginGui::resized()
     //[/UserPreResize]
 
     //[UserResized] Add your own custom resize handling here..
+    float sx = (float)getWidth()  / 860.0f;
+    float sy = (float)getHeight() / 600.0f;
+
+    auto sc = [&](int x, int y, int w, int h) -> juce::Rectangle<int> {
+        return { (int)roundf (x * sx), (int)roundf (y * sy),
+                 (int)roundf (w * sx), (int)roundf (h * sy) };
+    };
+
+    groupComponent6->setBounds      (sc (144, 96,  712, 496));
+    groupComponent4->setBounds      (sc (248, 8,   608, 88));
+    groupComponent2->setBounds      (sc (8,   96,  136, 312));
+    sliderAttack->setBounds         (sc (280, 56,  64,  24));
+    groupComponent5->setBounds      (sc (144, 96,  712, 496));
+    groupComponent->setBounds       (sc (8,   8,   240, 88));
+    toggleButtonTrack->setBounds    (sc (712, 24,  64,  24));
+    toggleButtonAutoTune->setBounds (sc (16,  24,  96,  24));
+    toggleButtonNoteA->setBounds    (sc (24,  216, 48,  24));
+    toggleButtonNoteBb->setBounds   (sc (24,  248, 48,  24));
+    toggleButtonNoteB->setBounds    (sc (24,  280, 48,  24));
+    toggleButtonNoteC->setBounds    (sc (24,  312, 48,  24));
+    toggleButtonNoteDb->setBounds   (sc (24,  344, 48,  24));
+    toggleButtonNoteD->setBounds    (sc (24,  376, 48,  24));
+    toggleButtonNoteEb->setBounds   (sc (80,  216, 48,  24));
+    toggleButtonNoteE->setBounds    (sc (80,  248, 48,  24));
+    toggleButtonNoteF->setBounds    (sc (80,  280, 48,  24));
+    toggleButtonNoteGb->setBounds   (sc (80,  312, 48,  24));
+    toggleButtonNoteAb->setBounds   (sc (80,  376, 48,  24));
+    toggleButtonNoteG->setBounds    (sc (80,  344, 48,  24));
+    textButtonSnapKey->setBounds    (sc (624, 24,  80,  24));
+    textButtonClearPitch->setBounds (sc (784, 64,  64,  24));
+    comboBoxKey->setBounds          (sc (32,  120, 88,  24));
+    comboBoxKeyType->setBounds      (sc (32,  152, 88,  24));
+    groupComponent3->setBounds      (sc (8,   408, 136, 184));
+    sliderRelease->setBounds        (sc (368, 56,  64,  24));
+    sliderAmount->setBounds         (sc (456, 56,  64,  24));
+    label4->setBounds               (sc (272, 24,  80,  24));
+    label5->setBounds               (sc (360, 24,  80,  24));
+    label6->setBounds               (sc (456, 24,  64,  24));
+    toggleButtonSnap->setBounds     (sc (784, 24,  64,  24));
+    textButtonClearNote->setBounds  (sc (712, 64,  64,  24));
+    label7->setBounds               (sc (16,  56,  56,  24));
+    sliderATSmooth->setBounds       (sc (72,  56,  40,  24));
+    label8->setBounds               (sc (128, 56,  56,  24));
+    sliderATAmount->setBounds       (sc (184, 56,  40,  24));
+    textButtonCANote->setBounds     (sc (624, 64,  80,  24));
+    textButtonDetectKey->setBounds  (sc (32,  184, 88,  24));
+    label3->setBounds               (sc (16,  432, 56,  24));
+    sliderMinLen->setBounds         (sc (80,  432, 48,  24));
+    label11->setBounds              (sc (16,  464, 56,  24));
+    sliderMaxInterval->setBounds    (sc (80,  464, 48,  24));
+    textButtonSetting->setBounds    (sc (24,  512, 104, 40));
+    textButtonUndoNote->setBounds   (sc (552, 24,  64,  24));
+    textButtonRedoNote->setBounds   (sc (552, 64,  64,  24));
     //[/UserResized]
 }
 
@@ -1089,7 +1233,7 @@ void PluginGui::buttonClicked (Button* buttonThatWasClicked)
     {
         //[UserButtonCode_textButtonSetting] -- add your button handler code here..
         SettingGui component(_proc);
-        std::int32_t r = juce::DialogWindow::showModalDialog("Setiing", &component, 0, juce::Colours::whitesmoke, false, false, false);
+        juce::DialogWindow::showModalDialog("Settings", &component, 0, juce::Colours::whitesmoke, false, false, false);
         //[/UserButtonCode_textButtonSetting]
     }
     else if (buttonThatWasClicked == textButtonUndoNote.get())
@@ -1159,6 +1303,22 @@ void PluginGui::mouseDown (const MouseEvent& e)
     std::int32_t x = e.getMouseDownX();
     std::int32_t y = e.getMouseDownY();
     _mouse_down_time = _x_to_time(x);
+
+    // Minimap bar: left-click/drag pans the notes view to that song position
+    if (e.mods.isLeftButtonDown()
+        && y >= _scrub_bar_y && y < _scrub_bar_y + _scrub_bar_h
+        && x >= _draw_x && x <= _draw_x + _draw_w)
+    {
+        _scrub_dragging = true;
+        float t = _scrub_view_total * (x - _draw_x) / (float)_draw_w;
+        float diff = _time_right - _time_left;
+        _time_left  = juce::jmax(0.f, t - diff * 0.5f);
+        _time_right = _time_left + diff;
+        if (_time_right > _time_max_len) { _time_right = _time_max_len; _time_left = juce::jmax(0.f, _time_right - diff); }
+        repaint();
+        return;
+    }
+
     if (e.mods.isLeftButtonDown())
     {
         if (_modify_tune)
@@ -1207,6 +1367,18 @@ void PluginGui::mouseDrag (const MouseEvent& e)
     //[UserCode_mouseDrag] -- Add your code here...
     std::int32_t x = e.position.getX();
     std::int32_t y = e.position.getY();
+
+    if (_scrub_dragging)
+    {
+        float t = _scrub_view_total * (x - _draw_x) / (float)_draw_w;
+        float diff = _time_right - _time_left;
+        _time_left  = juce::jmax(0.f, t - diff * 0.5f);
+        _time_right = _time_left + diff;
+        if (_time_right > _time_max_len) { _time_right = _time_max_len; _time_left = juce::jmax(0.f, _time_right - diff); }
+        repaint();
+        return;
+    }
+
     if (e.mods.isLeftButtonDown())
     {
         if (_mouse_down_time < _time_left || _mouse_down_time > _time_right)
@@ -1310,6 +1482,18 @@ void PluginGui::mouseUp (const MouseEvent& e)
 {
     //[UserCode_mouseUp] -- Add your code here...
 
+    if (_scrub_dragging)
+    {
+        _scrub_dragging = false;
+        float t = _scrub_view_total * (e.position.getX() - _draw_x) / (float)_draw_w;
+        float diff = _time_right - _time_left;
+        _time_left  = juce::jmax(0.f, t - diff * 0.5f);
+        _time_right = _time_left + diff;
+        if (_time_right > _time_max_len) { _time_right = _time_max_len; _time_left = juce::jmax(0.f, _time_right - diff); }
+        repaint();
+        return;
+    }
+
     if (e.mods.isLeftButtonDown())
     {
         if (_modify_tune == false && _new_tune == false)
@@ -1358,7 +1542,7 @@ void PluginGui::mouseUp (const MouseEvent& e)
     //[/UserCode_mouseUp]
 }
 
-void PluginGui::mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& wheel)
+void PluginGui::mouseWheelMove (const MouseEvent& /*e*/, const MouseWheelDetails& wheel)
 {
     //[UserCode_mouseWheelMove] -- Add your code here...
 #if 0
@@ -1477,6 +1661,18 @@ bool PluginGui::keyPressed (const KeyPress& key)
         {
             //_cur_node = _proc.get_manual_tune().select_tune(_x_to_time(e.getMouseDownX()), _y_to_pitch(e.getMouseDownY()), _select_pos);
         }
+        repaint();
+        return true;
+    }
+    else if (key == juce::KeyPress::leftKey)
+    {
+        _jump_to_measure(false);
+        repaint();
+        return true;
+    }
+    else if (key == juce::KeyPress::rightKey)
+    {
+        _jump_to_measure(true);
         repaint();
         return true;
     }
@@ -1795,6 +1991,37 @@ void PluginGui::_x_move(bool left)
         }
     }
 
+}
+
+void PluginGui::_jump_to_measure(bool forward)
+{
+    double bpm = _proc.get_bpm();
+    if (bpm <= 0.0) return;
+
+    int numerator = _proc.get_time_sig_numerator();
+    if (numerator <= 0) numerator = 4;
+
+    double beat_len    = 60.0 / bpm;
+    double measure_len = numerator * beat_len;
+    double ppq_time    = _proc.get_cur_time() - _proc.get_ppq_position() * beat_len;
+
+    // Measure index that _time_left currently falls in (floor division)
+    long long cur_measure = (long long)floor((_time_left - ppq_time) / measure_len);
+    long long target      = forward ? cur_measure + 1 : cur_measure - 1;
+
+    double new_left = ppq_time + target * measure_len;
+    new_left = juce::jmax(0.0, new_left);
+
+    double diff    = _time_right - _time_left;
+    _time_left     = new_left;
+    _time_right    = _time_left + diff;
+
+    if (_time_right > _time_max_len)
+    {
+        _time_right = _time_max_len;
+        _time_left  = _time_right - diff;
+        if (_time_left < 0.0) _time_left = 0.0;
+    }
 }
 
 void PluginGui::_y_move(bool up)

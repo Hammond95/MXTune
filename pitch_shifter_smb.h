@@ -30,7 +30,7 @@ public:
 public:
     virtual void update_shifter_variables(float inpitch, float outpitch) override;
     virtual void set_aref(float aref) override { _aref = aref; }
-    virtual void set_mix(float mix) override {}
+    virtual void set_mix(float /*mix*/) override {}
     virtual float get_latency() override { return sizeof(_in); }
     virtual float shifter(float in) override;
     

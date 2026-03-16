@@ -542,7 +542,7 @@ void KeyDetectGui::_update_key()
     {
         char str[32] = {0};
         const char *notes_name[12] = {"A", "Bb", "B", "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab"};
-        sprintf(str, "1=%s", notes_name[_key]);
+        snprintf(str, sizeof(str), "1=%s", notes_name[_key]);
         labelKey->setText(str, dontSendNotification);
     }
 }

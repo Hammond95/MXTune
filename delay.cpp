@@ -17,7 +17,7 @@
 
 
 #include <stdlib.h>
-#include <delay.h>
+#include "delay.h"
 
 delay::delay(std::uint32_t max_delay)
     : _max_delay(max_delay)

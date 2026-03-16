@@ -97,7 +97,7 @@ float pitch_shifter_st::shifter(float in)
     _st.putSamples(input, 1);
     
     soundtouch::SAMPLETYPE output[1] = {0.};
-    uint r = _st.receiveSamples(output, 1);
+    _st.receiveSamples(output, 1);
     
     return output[0];
 }
