@@ -203,6 +203,7 @@ private:
     std::unique_ptr<TextButton> textButtonRedoNote;
     std::unique_ptr<TextButton> textButtonMore;
 
+    std::unique_ptr<TooltipWindow> _tooltipWindow;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginGui)

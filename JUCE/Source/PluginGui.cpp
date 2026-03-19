@@ -434,6 +434,56 @@ PluginGui::PluginGui (AutotalentAudioProcessor& p)
     //[Constructor] You can add your own custom stuff here..
     _update_gui_parameter();
     startTimer(1000 / 15);
+
+    // Tooltips
+    _tooltipWindow = std::make_unique<TooltipWindow>(this, 600);
+
+    toggleButtonTrack->setTooltip("Enable pitch tracking. Records detected pitch while audio plays back.");
+    toggleButtonAutoTune->setTooltip("Enable automatic pitch correction. Snaps pitch to the current key/scale.");
+    textButtonSnapKey->setTooltip("Snap all detected pitches to the nearest note in the current key.");
+    textButtonClearPitch->setTooltip("Clear all recorded input pitch data.");
+    textButtonClearNote->setTooltip("Clear all manual tuning segments.");
+    textButtonCANote->setTooltip("Clear only auto-snapped segments (keeps manually drawn ones).");
+    textButtonDetectKey->setTooltip("Auto-detect the musical key from the recorded pitch data.");
+    comboBoxKey->setTooltip("Root note for the auto-tune key/scale.");
+    comboBoxKeyType->setTooltip("Scale type for auto-tune:\nMajor, Minor, Chromatic, or Custom (use note toggles below).");
+    toggleButtonSnap->setTooltip("Auto-snap: when drawing a new segment, snap its pitch to the current key.");
+    toggleButtonNoteA->setTooltip("Include A in the auto-tune scale.");
+    toggleButtonNoteBb->setTooltip("Include Bb in the auto-tune scale.");
+    toggleButtonNoteB->setTooltip("Include B in the auto-tune scale.");
+    toggleButtonNoteC->setTooltip("Include C in the auto-tune scale.");
+    toggleButtonNoteDb->setTooltip("Include Db in the auto-tune scale.");
+    toggleButtonNoteD->setTooltip("Include D in the auto-tune scale.");
+    toggleButtonNoteEb->setTooltip("Include Eb in the auto-tune scale.");
+    toggleButtonNoteE->setTooltip("Include E in the auto-tune scale.");
+    toggleButtonNoteF->setTooltip("Include F in the auto-tune scale.");
+    toggleButtonNoteGb->setTooltip("Include Gb in the auto-tune scale.");
+    toggleButtonNoteG->setTooltip("Include G in the auto-tune scale.");
+    toggleButtonNoteAb->setTooltip("Include Ab in the auto-tune scale.");
+    sliderAttack->setTooltip("Attack time (ms): how quickly the pitch correction fades in at the start of a segment.");
+    sliderRelease->setTooltip("Release time (ms): how quickly the pitch correction fades out at the end of a segment.");
+    sliderAmount->setTooltip("Correction amount (0 to 1). 0 = no correction, 1 = full snap to target pitch.");
+    sliderATSmooth->setTooltip("Auto-tune smoothing. Higher values make the pitch correction more gradual.");
+    sliderATAmount->setTooltip("Auto-tune correction strength (0 to 1).");
+    sliderMinLen->setTooltip("Minimum note length for Snap Key (ms). Notes shorter than this are ignored.");
+    sliderMaxInterval->setTooltip("Maximum gap between notes to bridge them into one segment (ms).");
+    textButtonSetting->setTooltip("Open the Settings panel.");
+    textButtonUndoNote->setTooltip("Undo the last pitch edit.");
+    textButtonRedoNote->setTooltip("Redo the last undone pitch edit.");
+    textButtonMore->setTooltip("Show / hide additional controls.");
+
+    // Propagate tooltips to Slider internal child components (TextBoxAbove Label intercepts mouse)
+    {
+        Slider* sliders[] = {sliderAttack.get(), sliderRelease.get(), sliderAmount.get(),
+                             sliderATSmooth.get(), sliderATAmount.get(),
+                             sliderMinLen.get(), sliderMaxInterval.get()};
+        for (Slider* s : sliders) {
+            String tip = s->getTooltip();
+            for (int i = 0; i < s->getNumChildComponents(); ++i)
+                if (auto* tc = dynamic_cast<SettableTooltipClient*>(s->getChildComponent(i)))
+                    tc->setTooltip(tip);
+        }
+    }
     //[/Constructor]
 }
 
