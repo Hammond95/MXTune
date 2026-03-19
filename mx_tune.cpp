@@ -111,7 +111,9 @@ mx_tune::mx_tune(unsigned int sample_rate)
     , _detector(new pitch_detector_aubio(sample_rate, "yinfast"))
     , _shifter_type(SHIFTER_TYPE_SOUND_TOUCH)
     , _shifter(new pitch_shifter_st(sample_rate))
+    , _shifter_r(new pitch_shifter_st(sample_rate))
     , _delay(sample_rate)
+    , _delay_r(sample_rate)
     , _aref(440)
     , _misc()
     , _sample_rate(sample_rate)
@@ -129,6 +131,8 @@ mx_tune::mx_tune(unsigned int sample_rate)
     , _midi_note_off(false)
     , _midi_note_on_time(0)
     , _midi_note(0)
+    , _live_midi_enabled(false)
+    , _live_midi_note(-1)
 {
     _detector->set_vthresh(_conf_detect_thresh);
     _detector->set_aref(_aref);
@@ -178,6 +182,7 @@ void mx_tune::set_aref(float aref)
     _aref = aref;
     _detector->set_aref(aref);
     _shifter->set_aref(aref);
+    if (_shifter_r) _shifter_r->set_aref(aref);
 }
 
 void mx_tune::set_mix(float mix)
@@ -325,11 +330,14 @@ std::list<std::pair<manual_tune::pitch_node, float> > mx_tune::get_outpitch(floa
 
 void mx_tune::run(float* in, float *out, std::int32_t n, float timestamp)
 {
+    if (_live_midi_enabled)
+        _live_midi_events.clear();
+
     for (std::int32_t i = 0; i < n; i++)
     {
         float inpitch;
         float conf;
-        
+
         if (_detector->get_pitch(in[i], inpitch, conf))
         {
             float time_end = timestamp + (float)i / (float)_sample_rate;
@@ -341,32 +349,116 @@ void mx_tune::run(float* in, float *out, std::int32_t n, float timestamp)
                 node.conf = conf;
                 node.pitch = inpitch;
                 _m_tune.set_inpitch(time_begin, time_end, node);
-                
+
                 //node.pitch = _tune.tune(inpitch);
                 //_m_tune.set_outpitch(time_begin, time_end, node);
             }
-            
+
             if (conf >= _conf_shift_thresh)
             {
                 _inpitch = inpitch;
                 _conf = conf;
-            
+
                 if (_auto_tune)
                 {
                     outpitch = _tune.tune(inpitch);
                 }
-                
+
                 manual_tune::pitch_node node = _m_tune.get_outpitch(time_begin);
                 if (node.conf >= _conf_shift_thresh)
                 {
                     outpitch = node.pitch;
                 }
             }
-            
+
             _shifter->update_shifter_variables(inpitch, outpitch);
+
+            if (_live_midi_enabled)
+            {
+                std::int32_t new_note = (conf >= _conf_shift_thresh)
+                    ? (std::int32_t)roundf(inpitch) + 69
+                    : -1;
+                new_note = (new_note >= 0 && new_note <= 127) ? new_note : -1;
+                if (new_note != _live_midi_note)
+                {
+                    if (_live_midi_note >= 0)
+                        _live_midi_events.push_back({i, _live_midi_note, false});
+                    if (new_note >= 0)
+                        _live_midi_events.push_back({i, new_note, true});
+                    _live_midi_note = new_note;
+                }
+            }
         }
-        
+
         out[i] = _delay.process(_shifter->shifter(in[i]));
+    }
+}
+
+
+void mx_tune::run_stereo(float* in_l, float* out_l, float* in_r, float* out_r,
+                         std::int32_t n, float timestamp)
+{
+    if (_live_midi_enabled)
+        _live_midi_events.clear();
+
+    for (std::int32_t i = 0; i < n; i++)
+    {
+        float inpitch;
+        float conf;
+
+        if (_detector->get_pitch(in_l[i], inpitch, conf))
+        {
+            float time_end = timestamp + (float)i / (float)_sample_rate;
+            float time_begin = time_end - _detector->get_time();
+            float outpitch = inpitch;
+            if (_track)
+            {
+                manual_tune::pitch_node node;
+                node.conf = conf;
+                node.pitch = inpitch;
+                _m_tune.set_inpitch(time_begin, time_end, node);
+            }
+
+            if (conf >= _conf_shift_thresh)
+            {
+                _inpitch = inpitch;
+                _conf = conf;
+
+                if (_auto_tune)
+                {
+                    outpitch = _tune.tune(inpitch);
+                }
+
+                manual_tune::pitch_node node = _m_tune.get_outpitch(time_begin);
+                if (node.conf >= _conf_shift_thresh)
+                {
+                    outpitch = node.pitch;
+                }
+            }
+
+            _shifter->update_shifter_variables(inpitch, outpitch);
+            if (_shifter_r) _shifter_r->update_shifter_variables(inpitch, outpitch);
+
+            if (_live_midi_enabled)
+            {
+                std::int32_t new_note = (conf >= _conf_shift_thresh)
+                    ? (std::int32_t)roundf(inpitch) + 69
+                    : -1;
+                new_note = (new_note >= 0 && new_note <= 127) ? new_note : -1;
+                if (new_note != _live_midi_note)
+                {
+                    if (_live_midi_note >= 0)
+                        _live_midi_events.push_back({i, _live_midi_note, false});
+                    if (new_note >= 0)
+                        _live_midi_events.push_back({i, new_note, true});
+                    _live_midi_note = new_note;
+                }
+            }
+        }
+
+        out_l[i] = _delay.process(_shifter->shifter(in_l[i]));
+        out_r[i] = _shifter_r ? _delay_r.process(_shifter_r->shifter(in_r[i]))
+                               : out_l[i];
     }
 }
 
@@ -529,28 +621,36 @@ void mx_tune::_set_shifter(std::uint32_t shifter_type)
     if (shifter_type == SHIFTER_TYPE_TALENT)
     {
         _shifter.reset(new pitch_shifter_talent(_sample_rate));
+        _shifter_r.reset(new pitch_shifter_talent(_sample_rate));
         _shifter->set_aref(_aref);
+        _shifter_r->set_aref(_aref);
         _apply_misc_param();
         _shifter_type = shifter_type;
     }
     else if (shifter_type == SHIFTER_TYPE_SOUND_TOUCH)
     {
         _shifter.reset(new pitch_shifter_st(_sample_rate));
+        _shifter_r.reset(new pitch_shifter_st(_sample_rate));
         _shifter->set_aref(_aref);
+        _shifter_r->set_aref(_aref);
         _apply_misc_param();
         _shifter_type = shifter_type;
     }
     else if (shifter_type == SHIFTER_TYPE_RUBBERBAND)
     {
         _shifter.reset(new pitch_shifter_rb(_sample_rate));
+        _shifter_r.reset(new pitch_shifter_rb(_sample_rate));
         _shifter->set_aref(_aref);
+        _shifter_r->set_aref(_aref);
         _apply_misc_param();
         _shifter_type = shifter_type;
     }
     else if (shifter_type == SHIFTER_TYPE_SMB)
     {
         _shifter.reset(new pitch_shifter_smb(_sample_rate));
+        _shifter_r.reset(new pitch_shifter_smb(_sample_rate));
         _shifter->set_aref(_aref);
+        _shifter_r->set_aref(_aref);
         _apply_misc_param();
         _shifter_type = shifter_type;
     }
@@ -604,7 +704,9 @@ void mx_tune::_apply_misc_param()
         
         if (v_str[0] == "delay")
         {
-            _delay.set_delay(std::atoi(v_str[1].c_str()));
+            std::uint32_t d = std::atoi(v_str[1].c_str());
+            _delay.set_delay(d);
+            _delay_r.set_delay(d);
             continue;
         }
     }

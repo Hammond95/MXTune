@@ -95,9 +95,23 @@ float pitch_shifter_st::shifter(float in)
 {
     soundtouch::SAMPLETYPE input[1] = {in};
     _st.putSamples(input, 1);
-    
-    soundtouch::SAMPLETYPE output[1] = {0.};
-    _st.receiveSamples(output, 1);
-    
-    return output[0];
+
+    // Drain all available samples from SoundTouch into the queue.
+    // SoundTouch outputs in variable-size bursts; consuming one-at-a-time
+    // without queuing causes dropouts (returns silent 0 most calls).
+    soundtouch::SAMPLETYPE tmp[256];
+    uint32_t n;
+    while ((n = _st.receiveSamples(tmp, 256)) > 0)
+    {
+        for (uint32_t k = 0; k < n; k++)
+            _out_queue.push_back(tmp[k]);
+    }
+
+    if (!_out_queue.empty())
+    {
+        float out = _out_queue.front();
+        _out_queue.pop_front();
+        return out;
+    }
+    return 0.f;
 }

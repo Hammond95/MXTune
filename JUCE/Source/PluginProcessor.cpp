@@ -83,6 +83,7 @@ AutotalentAudioProcessor::AutotalentAudioProcessor()
                     "midi.export=0\n";
                     
     _create_mxtune(_sample_rate);
+    _color_theme.load();
 }
 
 AutotalentAudioProcessor::~AutotalentAudioProcessor()
@@ -247,18 +248,23 @@ void AutotalentAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuf
     
     if (totalNumInputChannels > 0)
     {
-        auto* channel_data = buffer.getWritePointer (0);
-        std::int32_t num_samples =  buffer.getNumSamples();
+        std::int32_t num_samples = buffer.getNumSamples();
         if (_mx_tune)
         {
-            _mx_tune->run(channel_data, channel_data, num_samples, _cur_time);
+            if (totalNumInputChannels >= 2)
+            {
+                auto* ch0 = buffer.getWritePointer(0);
+                auto* ch1 = buffer.getWritePointer(1);
+                _mx_tune->run_stereo(ch0, ch0, ch1, ch1, num_samples, _cur_time);
+            }
+            else
+            {
+                auto* channel_data = buffer.getWritePointer(0);
+                _mx_tune->run(channel_data, channel_data, num_samples, _cur_time);
+            }
             _record_midi_to_note(midiMessages, num_samples, _cur_time);
             _output_midi_from_note(midiMessages, num_samples, _cur_time);
-        }
-        
-        for (int channel = 1; channel < totalNumInputChannels; ++channel)
-        {
-            buffer.copyFrom(channel, 0, channel_data, num_samples);
+            _output_live_midi(midiMessages);
         }
     }
     
@@ -792,7 +798,14 @@ void AutotalentAudioProcessor::parameterValueChanged (int parameterIndex, float 
             _mx_tune->set_detect_freq_range(_det_min_freq, _det_max_freq);
         }
     }
-    
+    else if (parameterIndex == PARAMETER_ID_FORMANT)
+    {
+        if (_mx_tune)
+        {
+            _mx_tune->set_formant_preserve(newValue > 0.f);
+        }
+    }
+
     if (!_gesture_is_starting)
     {
         _parameter_update_id++;
@@ -868,6 +881,8 @@ void AutotalentAudioProcessor::_create_mxtune(std::uint32_t sample_rate)
         _mx_tune->set_detect_gate(-_det_gate);
         _mx_tune->set_detect_freq_range(_det_min_freq, _det_max_freq);
         _mx_tune->set_misc_param(_misc_param);
+        _mx_tune->set_formant_preserve(get_parameter(PARAMETER_ID_FORMANT) > 0.f);
+        _mx_tune->enable_live_midi(_midi_live);
         setLatencySamples(_mx_tune->get_latency());
     }
 }
@@ -944,10 +959,35 @@ void AutotalentAudioProcessor::_output_midi_from_note(MidiBuffer& midiMessages, 
     }
 }
 
+void AutotalentAudioProcessor::_output_live_midi(MidiBuffer& midiMessages)
+{
+    if (!_midi_live || !_mx_tune)
+        return;
+
+    for (const auto& e : _mx_tune->get_live_midi_events())
+    {
+        if (e.on)
+        {
+            midiMessages.addEvent(
+                MidiMessage::noteOn(1, e.note, (uint8_t)80),
+                e.sample_pos);
+        }
+        else
+        {
+            midiMessages.addEvent(
+                MidiMessage::noteOff(1, e.note),
+                e.sample_pos);
+        }
+    }
+}
+
 void AutotalentAudioProcessor::_apply_misc_param()
 {
     _midi_record = _misc_param.find("midi.record=1") != _misc_param.npos;
     _midi_export = _misc_param.find("midi.export=1") != _misc_param.npos;
+    _midi_live   = _misc_param.find("midi.live=1")   != _misc_param.npos;
+    if (_mx_tune)
+        _mx_tune->enable_live_midi(_midi_live);
 }
     
 //==============================================================================

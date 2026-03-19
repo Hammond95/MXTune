@@ -18,6 +18,7 @@
 
 #ifndef __PITCH_SHIFTER_ST_H__
 #define __PITCH_SHIFTER_ST_H__
+#include <deque>
 #include <soundtouch/SoundTouch.h>
 #include "pitch_shifter.h"
 #include "ring_buffer.h"
@@ -41,6 +42,7 @@ private:
     float _sample_rate;
     soundtouch::SoundTouch _st;
     float _pitch;
+    std::deque<float> _out_queue;  // drains SoundTouch's variable-size output
 };
 
 #endif

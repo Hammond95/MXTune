@@ -151,6 +151,8 @@ private:
     };
     std::int32_t _key = _key_C;      //0:A 1:Bb .... 12:Ab 13:custom
     std::int32_t _key_type = _key_type_chromatic; //0:Major 1:Minor 2:Chromatic 3:custom
+
+    bool _more_open = false;
     //[/UserVariables]
 
     //==============================================================================
@@ -199,6 +201,7 @@ private:
     std::unique_ptr<TextButton> textButtonSetting;
     std::unique_ptr<TextButton> textButtonUndoNote;
     std::unique_ptr<TextButton> textButtonRedoNote;
+    std::unique_ptr<TextButton> textButtonMore;
 
 
     //==============================================================================

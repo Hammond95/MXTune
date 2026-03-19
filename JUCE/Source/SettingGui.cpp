@@ -18,6 +18,7 @@
 */
 
 //[Headers] You can add your own extra header files here...
+#include "AppearanceGui.h"
 //[/Headers]
 
 #include "SettingGui.h"
@@ -37,7 +38,7 @@ SettingGui::SettingGui (AutotalentAudioProcessor& p)
                                               TRANS("Detect")));
     addAndMakeVisible (groupComponent.get());
 
-    groupComponent->setBounds (8, 8, 584, 96);
+    groupComponent->setBounds (8, 8, 584, 120);
 
     label9.reset (new Label ("Det alg",
                              TRANS("Det alg:")));
@@ -171,13 +172,25 @@ SettingGui::SettingGui (AutotalentAudioProcessor& p)
                                                TRANS("misc")));
     addAndMakeVisible (groupComponent2.get());
 
-    groupComponent2->setBounds (8, 112, 584, 232);
+    groupComponent2->setBounds (8, 136, 584, 208);
 
     textButtonApply.reset (new TextButton ("Apply"));
     addAndMakeVisible (textButtonApply.get());
     textButtonApply->addListener (this);
 
-    textButtonApply->setBounds (16, 352, 568, 40);
+    textButtonApply->setBounds (16, 352, 472, 40);
+
+    textButtonAppearance.reset (new TextButton ("Appearance"));
+    addAndMakeVisible (textButtonAppearance.get());
+    textButtonAppearance->setButtonText (TRANS("Appearance..."));
+    textButtonAppearance->addListener (this);
+    textButtonAppearance->setBounds (496, 352, 96, 40);
+
+    toggleButtonFormant.reset (new ToggleButton ("Formant"));
+    addAndMakeVisible (toggleButtonFormant.get());
+    toggleButtonFormant->setButtonText (TRANS("Formant Preserve (RubberBand only)"));
+    toggleButtonFormant->addListener (this);
+    toggleButtonFormant->setBounds (16, 96, 320, 20);
 
     textEditorMisc.reset (new TextEditor ("new text editor"));
     addAndMakeVisible (textEditorMisc.get());
@@ -189,7 +202,7 @@ SettingGui::SettingGui (AutotalentAudioProcessor& p)
     textEditorMisc->setPopupMenuEnabled (true);
     textEditorMisc->setText (String());
 
-    textEditorMisc->setBounds (16, 128, 568, 208);
+    textEditorMisc->setBounds (16, 152, 568, 184);
 
     label6.reset (new Label ("VThresh",
                              TRANS("VThresh:")));
@@ -231,6 +244,10 @@ SettingGui::SettingGui (AutotalentAudioProcessor& p)
     sliderVThresh->setValue(_proc.get_parameter(AutotalentAudioProcessor::PARAMETER_ID_VTHRESH), dontSendNotification);
 
     textEditorMisc->setText(_proc.get_misc_param(), false);
+
+    toggleButtonFormant->setToggleState(
+        _proc.get_parameter(AutotalentAudioProcessor::PARAMETER_ID_FORMANT) > 0.f,
+        dontSendNotification);
     //[/Constructor]
 }
 
@@ -257,6 +274,8 @@ SettingGui::~SettingGui()
     textEditorMisc = nullptr;
     label6 = nullptr;
     sliderVThresh = nullptr;
+    textButtonAppearance = nullptr;
+    toggleButtonFormant = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -344,6 +363,13 @@ void SettingGui::buttonClicked (Button* buttonThatWasClicked)
     //[UserbuttonClicked_Pre]
     //[/UserbuttonClicked_Pre]
 
+    if (buttonThatWasClicked == textButtonAppearance.get())
+    {
+        AppearanceGui component(_proc);
+        juce::DialogWindow::showModalDialog("Appearance", &component, nullptr, juce::Colours::darkgrey, false, false, false);
+        return;
+    }
+
     if (buttonThatWasClicked == textButtonApply.get())
     {
         //[UserButtonCode_textButtonApply] -- add your button handler code here..
@@ -358,6 +384,9 @@ void SettingGui::buttonClicked (Button* buttonThatWasClicked)
         _proc.set_parameter(AutotalentAudioProcessor::PARAMETER_ID_DET_GATE, -sliderGate->getValue());
 
         _proc.set_parameter(AutotalentAudioProcessor::PARAMETER_ID_VTHRESH, sliderVThresh->getValue());
+
+        _proc.set_parameter(AutotalentAudioProcessor::PARAMETER_ID_FORMANT,
+                            toggleButtonFormant->getToggleState() ? 1.f : 0.f);
 
         _proc.set_misc_param(textEditorMisc->getText().toStdString());
         _proc.report_latency_samples();

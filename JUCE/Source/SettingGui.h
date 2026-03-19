@@ -22,6 +22,7 @@
 //[Headers]     -- You can add your own extra header files here --
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "AppearanceGui.h"
 //[/Headers]
 
 
@@ -80,6 +81,8 @@ private:
     std::unique_ptr<TextEditor> textEditorMisc;
     std::unique_ptr<Label> label6;
     std::unique_ptr<Slider> sliderVThresh;
+    std::unique_ptr<TextButton> textButtonAppearance;
+    std::unique_ptr<ToggleButton> toggleButtonFormant;
 
 
     //==============================================================================

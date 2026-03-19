@@ -172,6 +172,8 @@ set ( C_SRCS
 set ( CXX_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/JUCE/Source/PluginGui.cpp
     ${CMAKE_CURRENT_LIST_DIR}/JUCE/Source/SettingGui.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/JUCE/Source/AppearanceGui.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/JUCE/Source/appearance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mx_tune.cpp
     ${CMAKE_CURRENT_LIST_DIR}/manual_tune.cpp
     ${CMAKE_CURRENT_LIST_DIR}/pitch_shifter_rb.cpp
