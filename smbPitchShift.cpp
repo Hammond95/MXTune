@@ -40,7 +40,9 @@
 #include <math.h>
 #include <stdio.h>
 
-#define M_PI 3.14159265358979323846
+#ifndef M_PI
+#define M_PI 3.14159265358979323846264338327950288
+#endif
 #define MAX_FRAME_LENGTH 8192
 
 void smbFft(float *fftBuffer, long fftFrameSize, long sign);

@@ -417,6 +417,13 @@ PluginGui::PluginGui (AutotalentAudioProcessor& p)
     textButtonRedoNote->setBounds (552, 64, 64, 24);
 
 
+    textButtonMore.reset (new TextButton ("More"));
+    addAndMakeVisible (textButtonMore.get());
+    textButtonMore->setButtonText (TRANS("More v"));
+    textButtonMore->addListener (this);
+    textButtonMore->setColour (TextButton::buttonColourId, Colour (0x00a45c94));
+    textButtonMore->setBounds (796, 8, 56, 24);
+
     //[UserPreSize]
     //[/UserPreSize]
 
@@ -427,6 +434,56 @@ PluginGui::PluginGui (AutotalentAudioProcessor& p)
     //[Constructor] You can add your own custom stuff here..
     _update_gui_parameter();
     startTimer(1000 / 15);
+
+    // Tooltips
+    _tooltipWindow = std::make_unique<TooltipWindow>(this, 600);
+
+    toggleButtonTrack->setTooltip("Enable pitch tracking. Records detected pitch while audio plays back.");
+    toggleButtonAutoTune->setTooltip("Enable automatic pitch correction. Snaps pitch to the current key/scale.");
+    textButtonSnapKey->setTooltip("Snap all detected pitches to the nearest note in the current key.");
+    textButtonClearPitch->setTooltip("Clear all recorded input pitch data.");
+    textButtonClearNote->setTooltip("Clear all manual tuning segments.");
+    textButtonCANote->setTooltip("Clear only auto-snapped segments (keeps manually drawn ones).");
+    textButtonDetectKey->setTooltip("Auto-detect the musical key from the recorded pitch data.");
+    comboBoxKey->setTooltip("Root note for the auto-tune key/scale.");
+    comboBoxKeyType->setTooltip("Scale type for auto-tune:\nMajor, Minor, Chromatic, or Custom (use note toggles below).");
+    toggleButtonSnap->setTooltip("Auto-snap: when drawing a new segment, snap its pitch to the current key.");
+    toggleButtonNoteA->setTooltip("Include A in the auto-tune scale.");
+    toggleButtonNoteBb->setTooltip("Include Bb in the auto-tune scale.");
+    toggleButtonNoteB->setTooltip("Include B in the auto-tune scale.");
+    toggleButtonNoteC->setTooltip("Include C in the auto-tune scale.");
+    toggleButtonNoteDb->setTooltip("Include Db in the auto-tune scale.");
+    toggleButtonNoteD->setTooltip("Include D in the auto-tune scale.");
+    toggleButtonNoteEb->setTooltip("Include Eb in the auto-tune scale.");
+    toggleButtonNoteE->setTooltip("Include E in the auto-tune scale.");
+    toggleButtonNoteF->setTooltip("Include F in the auto-tune scale.");
+    toggleButtonNoteGb->setTooltip("Include Gb in the auto-tune scale.");
+    toggleButtonNoteG->setTooltip("Include G in the auto-tune scale.");
+    toggleButtonNoteAb->setTooltip("Include Ab in the auto-tune scale.");
+    sliderAttack->setTooltip("Attack time (ms): how quickly the pitch correction fades in at the start of a segment.");
+    sliderRelease->setTooltip("Release time (ms): how quickly the pitch correction fades out at the end of a segment.");
+    sliderAmount->setTooltip("Correction amount (0 to 1). 0 = no correction, 1 = full snap to target pitch.");
+    sliderATSmooth->setTooltip("Auto-tune smoothing. Higher values make the pitch correction more gradual.");
+    sliderATAmount->setTooltip("Auto-tune correction strength (0 to 1).");
+    sliderMinLen->setTooltip("Minimum note length for Snap Key (ms). Notes shorter than this are ignored.");
+    sliderMaxInterval->setTooltip("Maximum gap between notes to bridge them into one segment (ms).");
+    textButtonSetting->setTooltip("Open the Settings panel.");
+    textButtonUndoNote->setTooltip("Undo the last pitch edit.");
+    textButtonRedoNote->setTooltip("Redo the last undone pitch edit.");
+    textButtonMore->setTooltip("Show / hide additional controls.");
+
+    // Propagate tooltips to Slider internal child components (TextBoxAbove Label intercepts mouse)
+    {
+        Slider* sliders[] = {sliderAttack.get(), sliderRelease.get(), sliderAmount.get(),
+                             sliderATSmooth.get(), sliderATAmount.get(),
+                             sliderMinLen.get(), sliderMaxInterval.get()};
+        for (Slider* s : sliders) {
+            String tip = s->getTooltip();
+            for (int i = 0; i < s->getNumChildComponents(); ++i)
+                if (auto* tc = dynamic_cast<SettableTooltipClient*>(s->getChildComponent(i)))
+                    tc->setTooltip(tip);
+        }
+    }
     //[/Constructor]
 }
 
@@ -480,6 +537,7 @@ PluginGui::~PluginGui()
     textButtonSetting = nullptr;
     textButtonUndoNote = nullptr;
     textButtonRedoNote = nullptr;
+    textButtonMore = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -493,7 +551,7 @@ void PluginGui::paint (Graphics& g)
     _update_gui_parameter();
     //[/UserPrePaint]
 
-    g.fillAll (Colour (0xff323e44));
+    g.fillAll (_proc.get_color_theme().background);
 
     {
         int x = 152, y = 112, width = 696, height = 472;
@@ -502,24 +560,42 @@ void PluginGui::paint (Graphics& g)
         {
             float sx = (float)getWidth()  / 860.0f;
             float sy = (float)getHeight() / 600.0f;
-            x      = (int)roundf (152 * sx);
-            y      = (int)roundf (112 * sy);
-            width  = (int)roundf (696 * sx);
-            height = (int)roundf (472 * sy);
-            _draw_x = x + (int)roundf (24 * sx);
-            _draw_w = width - (int)roundf (24 * sx);
 
-            // Scrub bar sits inside the notes panel with a small gap above and below
-            // so it doesn't touch the GroupComponent border line.
+            int top_h   = (int)roundf(40 * sy);
+            int panel_h = _more_open ? (int)roundf(80 * sy) : 0;
+            int notes_y = top_h + panel_h;
+            int label_w = (int)roundf(28 * sx);
+
+            _draw_x = label_w;
+            _draw_w = getWidth() - label_w;
+
             int gap = juce::jmax(1, (int)roundf(2 * sy));
             _scrub_bar_h = juce::jmax(8, (int)roundf(12 * sy));
-            _scrub_bar_y = y + gap;
+            _scrub_bar_y = notes_y + gap;
             _draw_y      = _scrub_bar_y + _scrub_bar_h + gap;
-            _draw_h      = height - (_draw_y - y);
+            _draw_h      = getHeight() - _draw_y - gap;
+
+            x      = 0;
+            y      = notes_y;
+            width  = getWidth();
+            height = getHeight() - notes_y;
         }
         //[/UserPaintCustomArguments]
         g.setColour (fillColour);
         g.fillRect (x, y, width, height);
+
+        // Top bar separator line
+        float sy2 = (float)getHeight() / 600.0f;
+        int top_h = (int)roundf(40 * sy2);
+        g.setColour (juce::Colours::black.withAlpha(0.4f));
+        g.drawLine (0, top_h, getWidth(), top_h, 1.0f);
+
+        // More panel separator line (when open)
+        if (_more_open) {
+            int panel_bottom = top_h + (int)roundf(80 * sy2);
+            g.setColour (juce::Colours::black.withAlpha(0.3f));
+            g.drawLine (0, panel_bottom, getWidth(), panel_bottom, 1.0f);
+        }
     }
 
     // Overview/minimap bar: shows the full timeline, the current view window,
@@ -569,31 +645,68 @@ void PluginGui::paint (Graphics& g)
     {
         g.setOpacity(1.0);
         const char *node_name[12] = {"A", "Bb", "B", "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab"};
+
+        // Accidental (black key) note indices in the A=0 chromatic system:
+        // Bb=1, Db=4, Eb=6, Gb=9, Ab=11
+        auto is_accidental = [](int pitch) -> bool {
+            int n = (pitch % 12 + 12) % 12;
+            return n == 1 || n == 4 || n == 6 || n == 9 || n == 11;
+        };
+
+        // Draw alternating row backgrounds centered on each pitch (±0.5 semitone bands).
+        // Separator lines fall at half-semitone boundaries between bands.
         for (int i = _pitch_down; i <= _pitch_up; i++)
         {
-            if (_notes[(unsigned)(i + 12 * 8) % 12] > 0)
-            {
-                g.setColour (juce::Colours::white);
-            }
-            else
-            {
-                g.setColour (juce::Colours::grey);
-            }
+            // Each band spans from pitch-0.5 to pitch+0.5 (centered on the note)
+            float y_bottom = _pitch_to_y(i - 0.5f);
+            float y_top    = _pitch_to_y(i + 0.5f);
+            // Clamp to draw area
+            y_top    = juce::jmax(y_top,    (float)_draw_y);
+            y_bottom = juce::jmin(y_bottom, (float)(_draw_y + _draw_h));
 
-            float y = round(_pitch_to_y(i)) + 0.5;
+            if (is_accidental(i))
+                g.setColour(_proc.get_color_theme().noteAccidental);
+            else
+                g.setColour(_proc.get_color_theme().noteNatural);
+
+            g.fillRect((float)_draw_x, y_top, (float)_draw_w, y_bottom - y_top);
+        }
+
+        // For each pitch band:
+        //   - separator lines at ±0.5 semitone boundaries (between bands)
+        //   - a reference line at the exact tuned pitch (center of the band)
+        //   - label centered in the band
+        for (int i = _pitch_down; i <= _pitch_up; i++)
+        {
+            float y_center = _pitch_to_y(i);
+            float y_sep    = round(_pitch_to_y(i + 0.5f)) + 0.5f;
+
+            // Separator line at the top boundary of this band (between i and i+1)
+            g.setColour(_proc.get_color_theme().separatorLine);
+            g.drawLine(_draw_x, y_sep, _draw_x + _draw_w, y_sep, 1.0f);
+
+            // Tuned-pitch reference line at the center of the band (exact pitch)
+            float y_ref = round(y_center) + 0.5f;
+            g.setColour(_proc.get_color_theme().pitchRefLine);
+            g.drawLine(_draw_x, y_ref, _draw_x + _draw_w, y_ref, 0.7f);
+
+            // Label centered vertically in the band
+            if (_notes[(unsigned)(i + 12 * 8) % 12] > 0)
+                g.setColour(juce::Colours::white);
+            else
+                g.setColour(juce::Colours::grey);
+
             if ((i + 12 * 8) % 12 == 3)
             {
                 std::int32_t n = (i + 9 + 12 * 4) / 12;
                 char name[32];
                 snprintf(name, sizeof(name), "%s%d", node_name[(unsigned)(i + 12 * 8) % 12], n);
-                g.drawText(name, _draw_x - 24, y - 12, 24, 24, juce::Justification::centred, true);
+                g.drawText(name, _draw_x - 24, (int)(y_center - 12), 24, 24, juce::Justification::centred, true);
             }
             else
             {
-                g.drawText(node_name[(unsigned)(i + 12 * 8) % 12], _draw_x - 24, y - 12, 24, 24, juce::Justification::centred, true);
+                g.drawText(node_name[(unsigned)(i + 12 * 8) % 12], _draw_x - 24, (int)(y_center - 12), 24, 24, juce::Justification::centred, true);
             }
-            g.drawLine(_draw_x, y, _draw_x + _draw_w, y, 0.7);
-
         }
     }
 
@@ -617,7 +730,7 @@ void PluginGui::paint (Graphics& g)
         float y2 = _pitch_to_y(_pitch_down);
         if (x > _draw_x && x < _draw_x + _draw_w)
         {
-            g.setColour (juce::Colours::red);
+            g.setColour (_proc.get_color_theme().playhead);
             g.drawLine(x, y1, x, y2, 1);
         }
 
@@ -657,14 +770,14 @@ void PluginGui::paint (Graphics& g)
 
                 if (is_measure_start)
                 {
-                    g.setColour(juce::Colours::white.withAlpha(0.45f));
+                    g.setColour(_proc.get_color_theme().measureLine.withAlpha(0.45f));
                     g.drawLine(x, y1, x, y2, 1.0f);
 
                     // 1-based measure number (floor division for correct negative handling)
                     long long measure_num = (long long)floor((double)bi / numerator) + 1;
                     if (measure_num >= 1)
                     {
-                        g.setColour(juce::Colours::white.withAlpha(0.65f));
+                        g.setColour(_proc.get_color_theme().measureLine.withAlpha(0.65f));
                         g.drawText(String(measure_num),
                                    (int)x + 2, _draw_y + 2,
                                    40, (int)label_font_size + 4,
@@ -726,7 +839,7 @@ void PluginGui::paint (Graphics& g)
             _proc.get_manual_tune().get_tune(_time_left, _time_right);
 
 
-        g.setColour (juce::Colours::orange);
+        g.setColour (_proc.get_color_theme().tuneNodes);
         g.setOpacity(0.5);
         for (auto i: list)
         {
@@ -772,8 +885,7 @@ void PluginGui::paint (Graphics& g)
         }
 
 
-        //g.setColour (juce::Colours::red);
-        g.setColour (getLookAndFeel().findColour (Slider::thumbColourId));
+        g.setColour (_proc.get_color_theme().inPitch);
         g.strokePath (pitch_path, PathStrokeType (2.0f));
     }
 
@@ -808,7 +920,7 @@ void PluginGui::paint (Graphics& g)
             }
         }
 
-        g.setColour (juce::Colours::green);
+        g.setColour (_proc.get_color_theme().outPitch);
         g.strokePath (pitch_path, PathStrokeType (1.5f));
     }
 
@@ -829,51 +941,101 @@ void PluginGui::resized()
                  (int)roundf (w * sx), (int)roundf (h * sy) };
     };
 
-    groupComponent6->setBounds      (sc (144, 96,  712, 496));
-    groupComponent4->setBounds      (sc (248, 8,   608, 88));
-    groupComponent2->setBounds      (sc (8,   96,  136, 312));
-    sliderAttack->setBounds         (sc (280, 56,  64,  24));
-    groupComponent5->setBounds      (sc (144, 96,  712, 496));
-    groupComponent->setBounds       (sc (8,   8,   240, 88));
-    toggleButtonTrack->setBounds    (sc (712, 24,  64,  24));
-    toggleButtonAutoTune->setBounds (sc (16,  24,  96,  24));
-    toggleButtonNoteA->setBounds    (sc (24,  216, 48,  24));
-    toggleButtonNoteBb->setBounds   (sc (24,  248, 48,  24));
-    toggleButtonNoteB->setBounds    (sc (24,  280, 48,  24));
-    toggleButtonNoteC->setBounds    (sc (24,  312, 48,  24));
-    toggleButtonNoteDb->setBounds   (sc (24,  344, 48,  24));
-    toggleButtonNoteD->setBounds    (sc (24,  376, 48,  24));
-    toggleButtonNoteEb->setBounds   (sc (80,  216, 48,  24));
-    toggleButtonNoteE->setBounds    (sc (80,  248, 48,  24));
-    toggleButtonNoteF->setBounds    (sc (80,  280, 48,  24));
-    toggleButtonNoteGb->setBounds   (sc (80,  312, 48,  24));
-    toggleButtonNoteAb->setBounds   (sc (80,  376, 48,  24));
-    toggleButtonNoteG->setBounds    (sc (80,  344, 48,  24));
-    textButtonSnapKey->setBounds    (sc (624, 24,  80,  24));
-    textButtonClearPitch->setBounds (sc (784, 64,  64,  24));
-    comboBoxKey->setBounds          (sc (32,  120, 88,  24));
-    comboBoxKeyType->setBounds      (sc (32,  152, 88,  24));
-    groupComponent3->setBounds      (sc (8,   408, 136, 184));
-    sliderRelease->setBounds        (sc (368, 56,  64,  24));
-    sliderAmount->setBounds         (sc (456, 56,  64,  24));
-    label4->setBounds               (sc (272, 24,  80,  24));
-    label5->setBounds               (sc (360, 24,  80,  24));
-    label6->setBounds               (sc (456, 24,  64,  24));
-    toggleButtonSnap->setBounds     (sc (784, 24,  64,  24));
-    textButtonClearNote->setBounds  (sc (712, 64,  64,  24));
-    label7->setBounds               (sc (16,  56,  56,  24));
-    sliderATSmooth->setBounds       (sc (72,  56,  40,  24));
-    label8->setBounds               (sc (128, 56,  56,  24));
-    sliderATAmount->setBounds       (sc (184, 56,  40,  24));
-    textButtonCANote->setBounds     (sc (624, 64,  80,  24));
-    textButtonDetectKey->setBounds  (sc (32,  184, 88,  24));
-    label3->setBounds               (sc (16,  432, 56,  24));
-    sliderMinLen->setBounds         (sc (80,  432, 48,  24));
-    label11->setBounds              (sc (16,  464, 56,  24));
-    sliderMaxInterval->setBounds    (sc (80,  464, 48,  24));
-    textButtonSetting->setBounds    (sc (24,  512, 104, 40));
-    textButtonUndoNote->setBounds   (sc (552, 24,  64,  24));
-    textButtonRedoNote->setBounds   (sc (552, 64,  64,  24));
+    // All legacy group chrome hidden — layout is now flat top-bar + notes
+    groupComponent->setVisible  (false);
+    groupComponent4->setVisible (false);
+    groupComponent2->setVisible (false);
+    groupComponent3->setVisible (false);
+    groupComponent5->setVisible (false);
+    groupComponent6->setVisible (false);
+
+    // ── Top bar (y=8, h=24 in base coords) ──────────────────────────────────
+    toggleButtonAutoTune->setVisible (true);
+    toggleButtonTrack->setVisible    (true);
+    toggleButtonSnap->setVisible     (true);
+    comboBoxKey->setVisible          (true);
+    comboBoxKeyType->setVisible      (true);
+    textButtonUndoNote->setVisible   (true);
+    textButtonRedoNote->setVisible   (true);
+    textButtonSnapKey->setVisible    (true);
+    textButtonMore->setVisible       (true);
+
+    toggleButtonAutoTune->setBounds (sc (4,   8, 78, 24));
+    toggleButtonTrack->setBounds    (sc (86,  8, 52, 24));
+    toggleButtonSnap->setBounds     (sc (142, 8, 52, 24));
+    comboBoxKey->setBounds          (sc (202, 8, 68, 24));
+    comboBoxKeyType->setBounds      (sc (274, 8, 84, 24));
+    textButtonUndoNote->setBounds   (sc (370, 8, 52, 24));
+    textButtonRedoNote->setBounds   (sc (426, 8, 52, 24));
+    textButtonSnapKey->setBounds    (sc (486, 8, 72, 24));
+    textButtonMore->setBounds       (sc (796, 8, 56, 24));
+
+    // ── More panel (y=40..120, visible only when _more_open) ────────────────
+    const int MY = 40;
+    const bool sm = _more_open;
+
+    label7->setVisible           (sm);  sliderATSmooth->setVisible   (sm);
+    label8->setVisible           (sm);  sliderATAmount->setVisible   (sm);
+    label4->setVisible           (sm);  sliderAttack->setVisible     (sm);
+    label5->setVisible           (sm);  sliderRelease->setVisible    (sm);
+    label6->setVisible           (sm);  sliderAmount->setVisible     (sm);
+    label3->setVisible           (sm);  sliderMinLen->setVisible     (sm);
+    label11->setVisible          (sm);  sliderMaxInterval->setVisible(sm);
+    textButtonSetting->setVisible(sm);
+    textButtonDetectKey->setVisible  (sm);
+    textButtonCANote->setVisible     (sm);
+    textButtonClearNote->setVisible  (sm);
+    textButtonClearPitch->setVisible (sm);
+    toggleButtonNoteA->setVisible    (sm);
+    toggleButtonNoteBb->setVisible   (sm);
+    toggleButtonNoteB->setVisible    (sm);
+    toggleButtonNoteC->setVisible    (sm);
+    toggleButtonNoteDb->setVisible   (sm);
+    toggleButtonNoteD->setVisible    (sm);
+    toggleButtonNoteEb->setVisible   (sm);
+    toggleButtonNoteE->setVisible    (sm);
+    toggleButtonNoteF->setVisible    (sm);
+    toggleButtonNoteGb->setVisible   (sm);
+    toggleButtonNoteG->setVisible    (sm);
+    toggleButtonNoteAb->setVisible   (sm);
+
+    if (sm)
+    {
+        // Row 1 (y = MY+12): AT smooth/amount, tuning attack/release/amount, snap length/interval, setting
+        label7->setBounds            (sc (4,   MY+12, 52, 24));  // Smooth:
+        sliderATSmooth->setBounds    (sc (58,  MY+12, 44, 24));
+        label8->setBounds            (sc (106, MY+12, 52, 24));  // Amount:
+        sliderATAmount->setBounds    (sc (162, MY+12, 44, 24));
+        label4->setBounds            (sc (214, MY+12, 68, 24));  // Attack(ms)
+        sliderAttack->setBounds      (sc (286, MY+12, 52, 24));
+        label5->setBounds            (sc (342, MY+12, 68, 24));  // Release(ms)
+        sliderRelease->setBounds     (sc (414, MY+12, 52, 24));
+        label6->setBounds            (sc (470, MY+12, 52, 24));  // Amount
+        sliderAmount->setBounds      (sc (526, MY+12, 52, 24));
+        label3->setBounds            (sc (584, MY+12, 52, 24));  // Length:
+        sliderMinLen->setBounds      (sc (640, MY+12, 44, 24));
+        label11->setBounds           (sc (688, MY+12, 56, 24));  // Interval:
+        sliderMaxInterval->setBounds (sc (748, MY+12, 44, 24));
+        textButtonSetting->setBounds (sc (800, MY+12, 52, 24));
+
+        // Row 2 (y = MY+44): 12 note toggles + action buttons
+        toggleButtonNoteA->setBounds   (sc (4,   MY+44, 36, 24));
+        toggleButtonNoteBb->setBounds  (sc (40,  MY+44, 36, 24));
+        toggleButtonNoteB->setBounds   (sc (76,  MY+44, 36, 24));
+        toggleButtonNoteC->setBounds   (sc (112, MY+44, 36, 24));
+        toggleButtonNoteDb->setBounds  (sc (148, MY+44, 36, 24));
+        toggleButtonNoteD->setBounds   (sc (184, MY+44, 36, 24));
+        toggleButtonNoteEb->setBounds  (sc (220, MY+44, 36, 24));
+        toggleButtonNoteE->setBounds   (sc (256, MY+44, 36, 24));
+        toggleButtonNoteF->setBounds   (sc (292, MY+44, 36, 24));
+        toggleButtonNoteGb->setBounds  (sc (328, MY+44, 36, 24));
+        toggleButtonNoteG->setBounds   (sc (364, MY+44, 36, 24));
+        toggleButtonNoteAb->setBounds  (sc (400, MY+44, 36, 24));
+        textButtonDetectKey->setBounds (sc (444, MY+44, 64, 24));
+        textButtonCANote->setBounds    (sc (512, MY+44, 76, 24));
+        textButtonClearNote->setBounds (sc (592, MY+44, 60, 24));
+        textButtonClearPitch->setBounds(sc (656, MY+44, 60, 24));
+    }
     //[/UserResized]
 }
 
@@ -1265,6 +1427,14 @@ void PluginGui::buttonClicked (Button* buttonThatWasClicked)
         }
         _proc.get_mt_tune()->redo();
         //[/UserButtonCode_textButtonRedoNote]
+    }
+
+    else if (buttonThatWasClicked == textButtonMore.get())
+    {
+        _more_open = !_more_open;
+        textButtonMore->setButtonText(_more_open ? TRANS("Less ^") : TRANS("More v"));
+        resized();
+        repaint();
     }
 
     //[UserbuttonClicked_Post]

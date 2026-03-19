@@ -31,6 +31,7 @@ public:
     virtual void set_aref(float aref) = 0;
     virtual void set_mix(float mix) = 0;
     virtual bool set_misc_param(const char * /*key*/, const char * /*value*/) { return false; }
+    virtual void set_formant_preserve(bool /*enabled*/) {}
     virtual float get_latency() = 0;
     virtual float shifter(float in) = 0;
 };

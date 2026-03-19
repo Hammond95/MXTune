@@ -14,6 +14,7 @@
 #include <JuceHeader.h>
 #include "mx_tune.h"
 #include "PluginParameter.h"
+#include "appearance.h"
 
 //==============================================================================
 /**
@@ -55,6 +56,7 @@ public:
         PARAMETER_ID_DET_GATE,
         PARAMETER_ID_DET_MIN_FREQ,
         PARAMETER_ID_DET_MAX_FREQ,
+        PARAMETER_ID_FORMANT,
         PARAMETER_ID_NUM,
     };
     
@@ -124,6 +126,7 @@ public:
     
     float get_parameter(std::uint32_t id);
     void set_parameter(std::uint32_t id, float v);
+    ColorTheme& get_color_theme() { return _color_theme; }
     std::uint32_t get_parameters_update_id() { return _parameter_update_id; }
     std::string get_misc_param() { return _misc_param; }
     void set_misc_param(const std::string& misc_param);
@@ -134,6 +137,7 @@ private:
     void _report_latency_samples();
     void _record_midi_to_note(MidiBuffer& midiMessages, std::int32_t num_samples, float timestamp);
     void _output_midi_from_note(MidiBuffer& midiMessages, std::int32_t num_samples, float timestamp);
+    void _output_live_midi(MidiBuffer& midiMessages);
     void _apply_misc_param();
     
 private:
@@ -147,6 +151,7 @@ private:
     std::int32_t _time_sig_numerator   = 4;
     bool _is_playing = false;
     bool _is_bypassed = false;
+    ColorTheme _color_theme;
     
     std::int32_t _notes[12] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
     //float _def_attack = 0.050;
@@ -166,6 +171,7 @@ private:
     float _det_max_freq = 800;
     bool _midi_record = false;
     bool _midi_export = false;
+    bool _midi_live   = false;
     
     /* name def is_boolean scale min max parameter */
     parameter_item _parameters[PARAMETER_ID_NUM] = {
@@ -203,6 +209,7 @@ private:
         {"detector gate", 60, false, 200., 10., 100., NULL},
         {"detector min freq", 70, false, 3000., 20., 2000., NULL},
         {"detector max freq", 800., false, 3000., 20., 2000., NULL},
+        {"formant preserve", 1., true, 1., 0., 1., NULL},
         /* name def is_boolean scale min max parameter */
     };
     

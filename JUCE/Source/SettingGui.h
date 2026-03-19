@@ -1,91 +1,67 @@
 /*
-  ==============================================================================
-
-  This is an automatically generated GUI class created by the Projucer!
-
-  Be careful when adding custom code to these files, as only the code within
-  the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
-  and re-saved.
-
-  Created with Projucer version: 5.4.7
-
-  ------------------------------------------------------------------------------
-
-  The Projucer is part of the JUCE library.
-  Copyright (c) 2017 - ROLI Ltd.
-
-  ==============================================================================
+  Auto-generated skeleton preserved; custom code only in UserVariables/UserMethods sections.
 */
-
 #pragma once
 
-//[Headers]     -- You can add your own extra header files here --
+//[Headers]
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "AppearanceGui.h"
 //[/Headers]
 
-
-
-//==============================================================================
-/**
-                                                                    //[Comments]
-    An auto-generated component, created by the Projucer.
-
-    Describe your class and how it works here!
-                                                                    //[/Comments]
-*/
-class SettingGui  : public Component,
-                    public ComboBox::Listener,
-                    public Slider::Listener,
-                    public Button::Listener
+class SettingGui : public Component,
+                   public ComboBox::Listener,
+                   public Slider::Listener,
+                   public Button::Listener
 {
 public:
-    //==============================================================================
-    SettingGui (AutotalentAudioProcessor& p);
+    SettingGui(AutotalentAudioProcessor& p);
     ~SettingGui() override;
 
-    //==============================================================================
-    //[UserMethods]     -- You can add your own custom methods in this section.
+    //[UserMethods]
     //[/UserMethods]
 
-    void paint (Graphics& g) override;
+    void paint(Graphics& g) override;
     void resized() override;
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
-    void sliderValueChanged (Slider* sliderThatWasMoved) override;
-    void buttonClicked (Button* buttonThatWasClicked) override;
-
-
+    void comboBoxChanged(ComboBox* c) override;
+    void sliderValueChanged(Slider* s) override;
+    void buttonClicked(Button* b) override;
 
 private:
-    //[UserVariables]   -- You can add your own custom variables in this section.
+    //[UserVariables]
     AutotalentAudioProcessor& _proc;
+    void _updateSoundTouchVisibility();
     //[/UserVariables]
 
-    //==============================================================================
+    // Detection & Shifting group
     std::unique_ptr<GroupComponent> groupComponent;
-    std::unique_ptr<Label> label9;
-    std::unique_ptr<Label> label10;
-    std::unique_ptr<ComboBox> comboBoxDetAlg;
-    std::unique_ptr<ComboBox> comboBoxSftAlg;
-    std::unique_ptr<Slider> sliderMinFreq;
-    std::unique_ptr<Label> label2;
-    std::unique_ptr<Slider> sliderMaxFreq;
-    std::unique_ptr<Label> label3;
-    std::unique_ptr<Label> label4;
-    std::unique_ptr<Slider> sliderAfreq;
-    std::unique_ptr<Label> label5;
-    std::unique_ptr<Slider> sliderGate;
-    std::unique_ptr<GroupComponent> groupComponent2;
-    std::unique_ptr<TextButton> textButtonApply;
-    std::unique_ptr<TextEditor> textEditorMisc;
-    std::unique_ptr<Label> label6;
-    std::unique_ptr<Slider> sliderVThresh;
+    std::unique_ptr<Label>    label9, label10, label2, label3, label4, label5, label6;
+    std::unique_ptr<ComboBox> comboBoxDetAlg, comboBoxSftAlg;
+    std::unique_ptr<Slider>   sliderMinFreq, sliderMaxFreq, sliderAfreq, sliderGate, sliderVThresh;
+    std::unique_ptr<ToggleButton> toggleButtonFormant;
 
+    // MIDI group
+    std::unique_ptr<GroupComponent>  groupMidi;
+    std::unique_ptr<ToggleButton>    toggleButtonMidiRecord;
+    std::unique_ptr<ToggleButton>    toggleButtonMidiExport;
+    std::unique_ptr<ToggleButton>    toggleButtonMidiLive;
+
+    // SoundTouch group
+    std::unique_ptr<GroupComponent> groupSoundTouch;
+    std::unique_ptr<Label>   labelSeqMs, labelSeekwinMs, labelOverlapMs;
+    std::unique_ptr<Slider>  sliderSeqMs, sliderSeekwinMs, sliderOverlapMs;
+
+    // Extra params (advanced)
+    std::unique_ptr<Label>      labelExtra;
+    std::unique_ptr<TextEditor> textEditorExtra;
+
+    // Bottom buttons
+    std::unique_ptr<TextButton> textButtonApply;
+    std::unique_ptr<TextButton> textButtonAppearance;
+
+    // Tooltip support
+    std::unique_ptr<TooltipWindow> _tooltipWindow;
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SettingGui)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingGui)
 };
-
-//[EndFile] You can add extra defines here...
-//[/EndFile]
-

@@ -124,17 +124,17 @@ popd
 # The plugin only exports GetPluginFactory (VST3); VST2 is not supported by
 # JUCE 7's open-source build.
 # ---------------------------------------------------------------------------
-VST3_BUNDLE="/Library/Audio/Plug-Ins/VST3/mx_tune-${PLUGIN_VERSION}.vst3"
+VST3_BUNDLE="$HOME/Plug-Ins/VST3/mx_tune-${PLUGIN_VERSION}.vst3"
 echo_step "Installing VST3 bundle to $VST3_BUNDLE ..."
 
-sudo rm -rf "$VST3_BUNDLE"
-sudo mkdir -p "$VST3_BUNDLE/Contents/MacOS"
+rm -rf "$VST3_BUNDLE"
+mkdir -p "$VST3_BUNDLE/Contents/MacOS"
 
 # Copy the dylib as the bundle executable (no extension, named after the plugin)
-sudo cp "$SCRIPT_DIR/build-cmake/libmx_tune.dylib" "$VST3_BUNDLE/Contents/MacOS/mx_tune"
+cp "$SCRIPT_DIR/build-cmake/libmx_tune.dylib" "$VST3_BUNDLE/Contents/MacOS/mx_tune"
 
 # Write the required Info.plist so macOS and hosts recognise it as a valid bundle
-sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << PLIST
+cat > "$VST3_BUNDLE/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -163,10 +163,9 @@ sudo tee "$VST3_BUNDLE/Contents/Info.plist" > /dev/null << PLIST
 </plist>
 PLIST
 
-printf "BNDLhmmr" | sudo tee "$VST3_BUNDLE/Contents/PkgInfo" > /dev/null
-sudo chown -R root:wheel "$VST3_BUNDLE"
-sudo codesign --force --sign - "$VST3_BUNDLE"
-sudo chmod -R 755 "$VST3_BUNDLE"
+printf "BNDLhmmr" > "$VST3_BUNDLE/Contents/PkgInfo"
+codesign --force --sign - "$VST3_BUNDLE"
+chmod -R 755 "$VST3_BUNDLE"
 
 echo_step "Done! MXTune ${PLUGIN_VERSION} installed to $VST3_BUNDLE"
 echo_step "In Ableton: Preferences > Plug-Ins > enable VST3, rescan, look for 'mx_tune'"

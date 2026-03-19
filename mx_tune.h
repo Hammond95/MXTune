@@ -76,6 +76,13 @@ public:
         midi_msg msg;
         std::int32_t sample_position;
     };
+
+    struct live_midi_event
+    {
+        std::int32_t sample_pos;
+        std::int32_t note;   // 0-127
+        bool on;             // true = note_on, false = note_off
+    };
     
 public:
     explicit mx_tune(std::uint32_t sample_rate);
@@ -112,6 +119,11 @@ public:
     void enable_auto_tune(bool b) { _auto_tune = b; }
     manual_tune& get_manual_tune() { return _m_tune; }
     void enable_track(bool b) { _track = b; }
+    void set_formant_preserve(bool enabled)
+    {
+        _shifter->set_formant_preserve(enabled);
+        if (_shifter_r) _shifter_r->set_formant_preserve(enabled);
+    }
     
     void clear_note();
     void clear_pitch();
@@ -126,12 +138,18 @@ public:
     
     std::list<std::pair<manual_tune::pitch_node, float> > get_outpitch(float time_begin, float time_end);
     
-    void run(float *in, float *out, std::int32_t n, float timestamp  = 0.0);
+    void run(float *in, float *out, std::int32_t n, float timestamp = 0.0);
+    // Stereo variant: detects pitch from in_l, applies identical shift to both channels.
+    void run_stereo(float *in_l, float *out_l, float *in_r, float *out_r,
+                    std::int32_t n, float timestamp = 0.0);
     
     void record_midi_to_note(std::int32_t n, float timestamp,
                                 const std::list<midi_msg_node>& midi_list,
                                 float attack = 0.02, float release = 0.02, float amount = 0.7);
     std::list<midi_msg_node> output_midi_from_note(std::int32_t n, float timestamp);
+
+    void enable_live_midi(bool b) { _live_midi_enabled = b; }
+    const std::vector<live_midi_event>& get_live_midi_events() const { return _live_midi_events; }
     
 private:
     void _set_detector(std::uint32_t detector_type);
@@ -147,8 +165,10 @@ private:
     std::shared_ptr<pitch_detector> _detector;
     std::uint32_t _shifter_type;
     std::shared_ptr<pitch_shifter> _shifter;
-    
+    std::shared_ptr<pitch_shifter> _shifter_r;  // right-channel shifter (same shift, preserves stereo)
+
     delay _delay;
+    delay _delay_r;
     
     float _aref;
     std::string _misc;
@@ -173,6 +193,11 @@ private:
     bool _midi_note_off;
     float _midi_note_on_time;
     std::int32_t _midi_note;
+
+    /* live midi output */
+    bool _live_midi_enabled;
+    std::int32_t _live_midi_note;          // current active note, -1 = none
+    std::vector<live_midi_event> _live_midi_events;
 };
 
 #endif

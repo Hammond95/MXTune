@@ -44,6 +44,13 @@ pitch_shifter_rb::~pitch_shifter_rb()
 {
 }
 
+void pitch_shifter_rb::set_formant_preserve(bool enabled)
+{
+    _rb.setFormantOption(enabled
+        ? RubberBand::RubberBandStretcher::OptionFormantPreserved
+        : RubberBand::RubberBandStretcher::OptionFormantShifted);
+}
+
 void pitch_shifter_rb::update_shifter_variables(float inpitch, float outpitch)
 {
     float scale = 1;
